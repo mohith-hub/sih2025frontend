@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Backend folder (already deployed separately)
+backend/
+
+# Environment variables (will be set in Vercel)
+.env
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
