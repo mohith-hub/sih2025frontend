@@ -21,9 +21,12 @@ function FaceAttendance({ user, onSuccess, onClose }) {
     try {
       setMessage('🤖 Loading AI models...')
       
-      await faceapi.nets.tinyFaceDetector.loadFromUri('/models')
-      await faceapi.nets.faceLandmark68Net.loadFromUri('/models')
-      await faceapi.nets.faceRecognitionNet.loadFromUri('/models')
+      // Use CDN for production deployment - works on Vercel
+      const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
+      
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
       
       setMessage('📹 Starting camera...')
       await startCamera()

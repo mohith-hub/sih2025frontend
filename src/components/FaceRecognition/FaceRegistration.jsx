@@ -20,11 +20,13 @@ function FaceRegistration({ user, onComplete, onClose }) {
     try {
       setMessage('🤖 Loading AI models...')
       
-      // Load face-api.js models
-      console.log('Loading face detection models...')
-      await faceapi.nets.tinyFaceDetector.loadFromUri('/models')
-      await faceapi.nets.faceLandmark68Net.loadFromUri('/models')
-      await faceapi.nets.faceRecognitionNet.loadFromUri('/models')
+      // Use CDN for production deployment - works on Vercel
+      const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
+      
+      console.log('Loading face detection models from CDN...')
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
       
       console.log('Models loaded successfully!')
       setMessage('📹 Starting camera...')
@@ -34,7 +36,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
       
     } catch (error) {
       console.error('Error loading models:', error)
-      setMessage('❌ Error loading models: ' + error.message + '. Make sure model files are in public/models/')
+      setMessage('❌ Error loading models: ' + error.message)
     }
   }
 
