@@ -6,128 +6,79 @@ function FaceRegistration({ user, onComplete, onClose }) {
   const [isCapturing, setIsCapturing] = useState(false)
   const [capturedImages, setCapturedImages] = useState([])
   const [message, setMessage] = useState('Loading face detection models...')
-  const [cameraReady, setCameraReady] = useState(false)
   const videoRef = useRef()
   const canvasRef = useRef()
-  const streamRef = useRef()
 
   useEffect(() => {
-    loadModelsAndCamera()
+    loadModels()
     return () => {
       stopCamera()
     }
   }, [])
 
-  const loadModelsAndCamera = async () => {
+  const loadModels = async () => {
     try {
       setMessage('🤖 Loading AI models...')
       
       const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
       
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-      ])
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
       
-      console.log('✅ Models loaded successfully')
       setMessage('📹 Starting camera...')
-      
       await startCamera()
+      setIsLoading(false)
+      setMessage('👤 Position your face in the frame and click "Capture"')
+      
+      // Start face detection
+      setTimeout(() => {
+        detectFace()
+      }, 1000)
       
     } catch (error) {
-      console.error('Error:', error)
-      setMessage('❌ Error: ' + error.message)
+      console.error('Error loading models:', error)
+      setMessage('❌ Error loading models: ' + error.message)
     }
   }
 
   const startCamera = async () => {
     try {
-      console.log('🎥 Requesting camera access...')
-      
-      const constraints = {
-        video: {
-          width: { ideal: 640, max: 1280 },
-          height: { ideal: 480, max: 720 },
-          facingMode: 'user'
-        },
-        audio: false
-      }
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
-      streamRef.current = stream
-      console.log('✅ Camera stream obtained')
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      })
       
       if (videoRef.current) {
-        // Critical: Set srcObject and force play
         videoRef.current.srcObject = stream
-        
-        // Wait for metadata to load
-        videoRef.current.onloadedmetadata = async () => {
-          try {
-            console.log('📹 Video metadata loaded, starting playback...')
-            
-            // Force play the video
-            await videoRef.current.play()
-            
-            console.log('✅ Video is now playing!')
-            setCameraReady(true)
-            setIsLoading(false)
-            setMessage('👤 Position your face in the frame and click "Capture"')
-            
-            // Start face detection after video is confirmed playing
-            setTimeout(() => {
-              detectFace()
-            }, 500)
-            
-          } catch (playError) {
-            console.error('❌ Video play error:', playError)
-            setMessage('❌ Could not start video playback. Please refresh and try again.')
-          }
-        }
-        
-        // Handle any video errors
-        videoRef.current.onerror = (error) => {
-          console.error('❌ Video element error:', error)
-          setMessage('❌ Video error occurred. Please refresh and try again.')
-        }
       }
     } catch (error) {
-      console.error('❌ Camera access error:', error)
+      console.error('Camera error:', error)
       setMessage('❌ Camera access denied. Please allow camera access and refresh.')
     }
   }
 
   const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop())
-      streamRef.current = null
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks()
+      tracks.forEach(track => track.stop())
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null
-    }
-    setCameraReady(false)
   }
 
   const detectFace = async () => {
-    if (!videoRef.current || !canvasRef.current || !streamRef.current || !cameraReady) return
+    if (!videoRef.current || !canvasRef.current) return
 
     const video = videoRef.current
     const canvas = canvasRef.current
-
-    // Double-check video is ready and playing
-    if (video.readyState < 2 || video.paused) {
-      console.log('Video not ready, retrying...')
-      setTimeout(detectFace, 500)
-      return
-    }
-
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    
     const ctx = canvas.getContext('2d')
 
-    const runDetection = async () => {
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+
+    const detectFaces = async () => {
       try {
         const detection = await faceapi
           .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
@@ -141,48 +92,39 @@ function FaceRegistration({ user, onComplete, onClose }) {
           faceapi.draw.drawFaceLandmarks(canvas, [detection])
           setMessage('✅ Face detected! Ready to capture.')
         } else {
-          setMessage('⚠️ Please position your face clearly in the frame.')
+          setMessage('⚠️ No face detected. Please position your face in the frame.')
         }
 
-        if (!isCapturing && cameraReady && streamRef.current) {
-          requestAnimationFrame(runDetection)
+        if (!isCapturing) {
+          requestAnimationFrame(detectFaces)
         }
       } catch (error) {
-        console.log('Detection error:', error)
-        if (!isCapturing && cameraReady && streamRef.current) {
-          setTimeout(runDetection, 100)
-        }
+        console.error('Face detection error:', error)
       }
     }
 
-    runDetection()
+    detectFaces()
   }
 
   const captureFace = async () => {
-    if (!videoRef.current || !cameraReady || capturedImages.length >= 3) return
+    if (!videoRef.current) return
 
     setIsCapturing(true)
+    const video = videoRef.current
 
     try {
-      const video = videoRef.current
-      
-      // Ensure video is playing
-      if (video.paused) {
-        await video.play()
-      }
-      
       const detection = await faceapi
         .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor()
 
       if (!detection) {
-        setMessage('❌ No face detected. Please position your face clearly.')
+        setMessage('❌ No face detected. Please try again.')
         setIsCapturing(false)
         return
       }
 
-      // Capture image
+      // Capture the face image
       const canvas = document.createElement('canvas')
       canvas.width = video.videoWidth
       canvas.height = video.videoHeight
@@ -204,16 +146,17 @@ function FaceRegistration({ user, onComplete, onClose }) {
       
     } catch (error) {
       console.error('Capture error:', error)
-      setMessage('❌ Error capturing face. Please try again.')
+      setMessage('❌ Error capturing face: ' + error.message)
     }
     
     setIsCapturing(false)
     
+    // Resume face detection after 2 seconds
     setTimeout(() => {
-      if (capturedImages.length < 2) {
+      if (capturedImages.length < 3) {
         detectFace()
       }
-    }, 1000)
+    }, 2000)
   }
 
   const registerFace = async () => {
@@ -222,20 +165,22 @@ function FaceRegistration({ user, onComplete, onClose }) {
     try {
       setMessage('📡 Registering face data...')
       
+      const registrationData = {
+        studentId: user.id,
+        studentName: user.name,
+        faceData: capturedImages.map(img => ({
+          descriptor: img.descriptor,
+          timestamp: img.timestamp
+        }))
+      }
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/face/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          studentId: user.id,
-          studentName: user.name,
-          faceData: capturedImages.map(img => ({
-            descriptor: img.descriptor,
-            timestamp: img.timestamp
-          }))
-        })
+        body: JSON.stringify(registrationData)
       })
 
       const result = await response.json()
@@ -243,7 +188,6 @@ function FaceRegistration({ user, onComplete, onClose }) {
       if (result.success) {
         setMessage('🎉 Face registration successful!')
         setTimeout(() => {
-          stopCamera()
           onComplete(result.data)
         }, 1500)
       } else {
@@ -273,7 +217,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
         background: 'white',
         borderRadius: '12px',
         padding: '2rem',
-        maxWidth: '700px',
+        maxWidth: '800px',
         width: '100%',
         maxHeight: '90vh',
         overflow: 'auto'
@@ -281,10 +225,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ margin: 0 }}>📷 Face Registration - {user.name}</h2>
           <button 
-            onClick={() => {
-              stopCamera()
-              onClose()
-            }} 
+            onClick={onClose}
             style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
           >
             ✕
@@ -293,8 +234,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
 
         <div style={{
           padding: '1rem',
-          background: message.includes('✅') || message.includes('🎉') ? '#dcfce7' : 
-                     message.includes('❌') ? '#fee2e2' : '#dbeafe',
+          background: message.includes('✅') || message.includes('🎉') ? '#dcfce7' : message.includes('❌') ? '#fee2e2' : '#dbeafe',
           borderRadius: '8px',
           marginBottom: '1rem',
           textAlign: 'center',
@@ -304,115 +244,91 @@ function FaceRegistration({ user, onComplete, onClose }) {
         </div>
 
         {!isLoading && (
-          <div>
-            <div style={{ 
-              position: 'relative', 
-              borderRadius: '8px', 
-              overflow: 'hidden', 
-              background: '#000',
-              marginBottom: '1rem',
-              minHeight: '300px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{ 
-                  width: '100%', 
-                  height: 'auto',
-                  minHeight: '300px',
-                  objectFit: 'cover',
-                  display: 'block',
-                  backgroundColor: '#000'
-                }}
-              />
-              <canvas
-                ref={canvasRef}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  pointerEvents: 'none'
-                }}
-              />
-              
-              {/* Loading overlay while camera starts */}
-              {!cameraReady && (
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  color: 'white',
-                  fontSize: '1.2rem',
-                  textAlign: 'center'
-                }}>
-                  📹 Starting camera...
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-              <button
-                onClick={captureFace}
-                disabled={!cameraReady || isCapturing || capturedImages.length >= 3}
-                style={{
-                  background: (!cameraReady || isCapturing) ? '#9ca3af' : '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '8px',
-                  cursor: (!cameraReady || isCapturing) ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold',
-                  flex: 1
-                }}
-              >
-                {isCapturing ? 'Capturing...' : `📸 Capture Face (${capturedImages.length}/3)`}
-              </button>
-
-              {capturedImages.length >= 1 && (
-                <button
-                  onClick={registerFace}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
+            <div>
+              <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', background: '#000' }}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: '100%', height: '300px', objectFit: 'cover' }}
+                />
+                <canvas
+                  ref={canvasRef}
                   style={{
-                    background: '#10b981',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
+                <button
+                  onClick={captureFace}
+                  disabled={isLoading || isCapturing || capturedImages.length >= 3}
+                  style={{
+                    background: isCapturing ? '#9ca3af' : '#3b82f6',
                     color: 'white',
                     border: 'none',
                     padding: '0.75rem 1.5rem',
                     borderRadius: '8px',
-                    cursor: 'pointer',
+                    cursor: isCapturing ? 'not-allowed' : 'pointer',
                     fontWeight: 'bold',
                     flex: 1
                   }}
                 >
-                  ✅ Complete Registration
+                  {isCapturing ? 'Capturing...' : `📸 Capture Face (${capturedImages.length}/3)`}
                 </button>
-              )}
+
+                {capturedImages.length >= 1 && (
+                  <button
+                    onClick={registerFace}
+                    style={{
+                      background: '#10b981',
+                      color: 'white',
+                      border: 'none',
+                      padding: '0.75rem 1.5rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      flex: 1
+                    }}
+                  >
+                    ✅ Complete Registration
+                  </button>
+                )}
+              </div>
             </div>
 
-            {capturedImages.length > 0 && (
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+            <div>
+              <h4>Captured Images:</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {capturedImages.map((img, index) => (
-                  <img 
-                    key={img.id}
-                    src={img.imageData} 
-                    alt={`Capture ${index + 1}`}
-                    style={{ 
-                      width: '60px', 
-                      height: '60px', 
-                      objectFit: 'cover', 
-                      borderRadius: '8px', 
-                      border: '2px solid #10b981' 
-                    }}
-                  />
+                  <div key={img.id} style={{ position: 'relative', border: '2px solid #e5e7eb', borderRadius: '8px', overflow: 'hidden' }}>
+                    <img 
+                      src={img.imageData} 
+                      alt={`Capture ${index + 1}`}
+                      style={{ width: '100%', height: '80px', objectFit: 'cover' }}
+                    />
+                  </div>
                 ))}
               </div>
-            )}
+
+              {capturedImages.length > 0 && (
+                <div style={{ marginTop: '1rem', padding: '0.5rem', background: '#f0f9ff', borderRadius: '6px', fontSize: '0.8rem' }}>
+                  💡 <strong>Tips:</strong>
+                  <ul style={{ margin: '0.5rem 0', paddingLeft: '1rem' }}>
+                    <li>Look directly at camera</li>
+                    <li>Good lighting on face</li>
+                    <li>Different angles help accuracy</li>
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
