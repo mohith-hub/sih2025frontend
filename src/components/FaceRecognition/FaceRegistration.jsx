@@ -6,6 +6,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
   const [isCapturing, setIsCapturing] = useState(false)
   const [capturedImages, setCapturedImages] = useState([])
   const [message, setMessage] = useState('Loading face detection models...')
+  const [cameraReady, setCameraReady] = useState(false)
   const videoRef = useRef()
   const canvasRef = useRef()
   const streamRef = useRef()
@@ -29,7 +30,9 @@ function FaceRegistration({ user, onComplete, onClose }) {
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
       ])
       
+      console.log('✅ Models loaded successfully')
       setMessage('📹 Starting camera...')
+      
       await startCamera()
       
     } catch (error) {
@@ -40,40 +43,58 @@ function FaceRegistration({ user, onComplete, onClose }) {
 
   const startCamera = async () => {
     try {
+      console.log('🎥 Requesting camera access...')
+      
       const constraints = {
         video: {
           width: { ideal: 640, max: 1280 },
           height: { ideal: 480, max: 720 },
           facingMode: 'user'
-        }
+        },
+        audio: false
       }
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
       streamRef.current = stream
+      console.log('✅ Camera stream obtained')
       
       if (videoRef.current) {
+        // Critical: Set srcObject and force play
         videoRef.current.srcObject = stream
         
-        // Force video to play and ensure it's visible
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play().then(() => {
-            console.log('✅ Video playing successfully')
+        // Wait for metadata to load
+        videoRef.current.onloadedmetadata = async () => {
+          try {
+            console.log('📹 Video metadata loaded, starting playback...')
+            
+            // Force play the video
+            await videoRef.current.play()
+            
+            console.log('✅ Video is now playing!')
+            setCameraReady(true)
             setIsLoading(false)
             setMessage('👤 Position your face in the frame and click "Capture"')
             
-            // Start face detection
+            // Start face detection after video is confirmed playing
             setTimeout(() => {
               detectFace()
-            }, 1000)
-          }).catch(e => {
-            console.error('Video play error:', e)
-            setMessage('❌ Video playback error. Please refresh and try again.')
-          })
+            }, 500)
+            
+          } catch (playError) {
+            console.error('❌ Video play error:', playError)
+            setMessage('❌ Could not start video playback. Please refresh and try again.')
+          }
+        }
+        
+        // Handle any video errors
+        videoRef.current.onerror = (error) => {
+          console.error('❌ Video element error:', error)
+          setMessage('❌ Video error occurred. Please refresh and try again.')
         }
       }
     } catch (error) {
-      console.error('Camera error:', error)
-      setMessage('❌ Camera access denied. Please allow camera access.')
+      console.error('❌ Camera access error:', error)
+      setMessage('❌ Camera access denied. Please allow camera access and refresh.')
     }
   }
 
@@ -85,17 +106,19 @@ function FaceRegistration({ user, onComplete, onClose }) {
     if (videoRef.current) {
       videoRef.current.srcObject = null
     }
+    setCameraReady(false)
   }
 
   const detectFace = async () => {
-    if (!videoRef.current || !canvasRef.current || !streamRef.current) return
+    if (!videoRef.current || !canvasRef.current || !streamRef.current || !cameraReady) return
 
     const video = videoRef.current
     const canvas = canvasRef.current
 
-    // Ensure video is ready
-    if (video.readyState !== 4) {
-      setTimeout(detectFace, 100)
+    // Double-check video is ready and playing
+    if (video.readyState < 2 || video.paused) {
+      console.log('Video not ready, retrying...')
+      setTimeout(detectFace, 500)
       return
     }
 
@@ -118,14 +141,17 @@ function FaceRegistration({ user, onComplete, onClose }) {
           faceapi.draw.drawFaceLandmarks(canvas, [detection])
           setMessage('✅ Face detected! Ready to capture.')
         } else {
-          setMessage('⚠️ Please position your face in the frame.')
+          setMessage('⚠️ Please position your face clearly in the frame.')
         }
 
-        if (!isCapturing && streamRef.current) {
+        if (!isCapturing && cameraReady && streamRef.current) {
           requestAnimationFrame(runDetection)
         }
       } catch (error) {
         console.log('Detection error:', error)
+        if (!isCapturing && cameraReady && streamRef.current) {
+          setTimeout(runDetection, 100)
+        }
       }
     }
 
@@ -133,12 +159,18 @@ function FaceRegistration({ user, onComplete, onClose }) {
   }
 
   const captureFace = async () => {
-    if (!videoRef.current || capturedImages.length >= 3) return
+    if (!videoRef.current || !cameraReady || capturedImages.length >= 3) return
 
     setIsCapturing(true)
 
     try {
       const video = videoRef.current
+      
+      // Ensure video is playing
+      if (video.paused) {
+        await video.play()
+      }
+      
       const detection = await faceapi
         .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
@@ -261,7 +293,8 @@ function FaceRegistration({ user, onComplete, onClose }) {
 
         <div style={{
           padding: '1rem',
-          background: message.includes('✅') || message.includes('🎉') ? '#dcfce7' : message.includes('❌') ? '#fee2e2' : '#dbeafe',
+          background: message.includes('✅') || message.includes('🎉') ? '#dcfce7' : 
+                     message.includes('❌') ? '#fee2e2' : '#dbeafe',
           borderRadius: '8px',
           marginBottom: '1rem',
           textAlign: 'center',
@@ -278,7 +311,10 @@ function FaceRegistration({ user, onComplete, onClose }) {
               overflow: 'hidden', 
               background: '#000',
               marginBottom: '1rem',
-              aspectRatio: '4/3'
+              minHeight: '300px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
             }}>
               <video
                 ref={videoRef}
@@ -287,9 +323,11 @@ function FaceRegistration({ user, onComplete, onClose }) {
                 muted
                 style={{ 
                   width: '100%', 
-                  height: '100%', 
+                  height: 'auto',
+                  minHeight: '300px',
                   objectFit: 'cover',
-                  display: 'block'
+                  display: 'block',
+                  backgroundColor: '#000'
                 }}
               />
               <canvas
@@ -303,19 +341,34 @@ function FaceRegistration({ user, onComplete, onClose }) {
                   pointerEvents: 'none'
                 }}
               />
+              
+              {/* Loading overlay while camera starts */}
+              {!cameraReady && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  color: 'white',
+                  fontSize: '1.2rem',
+                  textAlign: 'center'
+                }}>
+                  📹 Starting camera...
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
               <button
                 onClick={captureFace}
-                disabled={isLoading || isCapturing || capturedImages.length >= 3}
+                disabled={!cameraReady || isCapturing || capturedImages.length >= 3}
                 style={{
-                  background: isCapturing ? '#9ca3af' : '#3b82f6',
+                  background: (!cameraReady || isCapturing) ? '#9ca3af' : '#3b82f6',
                   color: 'white',
                   border: 'none',
                   padding: '0.75rem 1.5rem',
                   borderRadius: '8px',
-                  cursor: isCapturing || capturedImages.length >= 3 ? 'not-allowed' : 'pointer',
+                  cursor: (!cameraReady || isCapturing) ? 'not-allowed' : 'pointer',
                   fontWeight: 'bold',
                   flex: 1
                 }}
