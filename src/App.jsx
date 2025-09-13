@@ -27,7 +27,7 @@ function Dashboard({ user, onLogout }) {
   }, [])
 
   useEffect(() => {
-    if (user) {
+    if (user && user.role === 'student') {
       checkFaceRegistration()
     }
   }, [user])
@@ -77,7 +77,7 @@ function Dashboard({ user, onLogout }) {
       const result = await response.json()
       
       if (result.success) {
-        setAttendanceMessage(`✅ Attendance marked for ${result.classInfo.name}! (${result.classInfo.presentCount}/${result.classInfo.totalCount} present)`)
+        setAttendanceMessage(`✅ Attendance marked for ${qrData.className}! Teacher: ${qrData.teacherName}`)
       } else {
         setAttendanceMessage(`❌ ${result.message}`)
       }
@@ -147,105 +147,24 @@ function Dashboard({ user, onLogout }) {
 
       {/* Main Content */}
       <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-        {/* Status Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            border: '2px solid #bfdbfe'
-          }}>
-            <h3 style={{ color: '#1e40af', marginTop: 0 }}>🔄 System Status</h3>
-            <p><strong>Backend:</strong> {backendStatus}</p>
-            <p><strong>User:</strong> ✅ Authenticated as {user.role}</p>
+        
+        {/* System Status Card */}
+        <div style={{
+          background: 'white',
+          padding: '1.5rem',
+          borderRadius: '12px',
+          border: '2px solid #bfdbfe',
+          marginBottom: '2rem'
+        }}>
+          <h3 style={{ color: '#1e40af', marginTop: 0 }}>🔄 System Status</h3>
+          <p><strong>Backend:</strong> {backendStatus}</p>
+          <p><strong>User:</strong> ✅ Authenticated as {user.role}</p>
+          {user.role === 'student' && (
             <p><strong>Face Recognition:</strong> {faceRegistered ? '✅ Registered' : '⏳ Not Registered'}</p>
-          </div>
-
-          <div style={{
-            background: 'white',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            border: '2px solid #bbf7d0'
-          }}>
-            <h3 style={{ color: '#166534', marginTop: 0 }}>📊 Today's Stats</h3>
-            <p><strong>Classes:</strong> 4 scheduled</p>
-            <p><strong>Attendance:</strong> 85% average</p>
-            <p><strong>Methods:</strong> QR Code + Face Recognition</p>
-          </div>
+          )}
         </div>
 
-        {/* Student Dashboard */}
-        {user.role === 'student' && (
-          <div style={{
-            background: 'white',
-            padding: '2rem',
-            borderRadius: '12px',
-            border: '2px solid #fbbf24'
-          }}>
-            <h3 style={{ color: '#92400e', marginTop: 0 }}>🎯 Student Dashboard</h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
-              <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '8px' }}>
-                <h4>📅 Today's Schedule</h4>
-                <ul>
-                  <li>9:00 AM - Mathematics</li>
-                  <li>11:00 AM - Physics</li>
-                  <li>2:00 PM - <span style={{color: '#059669'}}>Free Period</span></li>
-                  <li>3:00 PM - Computer Science</li>
-                </ul>
-              </div>
-
-              <div style={{ padding: '1rem', background: '#ecfdf5', borderRadius: '8px' }}>
-                <h4>✨ Personalized Tasks</h4>
-                <ul>
-                  <li>📚 Practice DSA problems (30 min)</li>
-                  <li>🤖 Watch ML tutorial (25 min)</li>
-                  <li>💻 Build React component (35 min)</li>
-                </ul>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              <button 
-                onClick={() => setShowQRScanner(true)}
-                style={{
-                  background: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                📱 Scan QR Code
-              </button>
-              
-              <button 
-                onClick={() => {
-                  if (faceRegistered) {
-                    setShowFaceAttendance(true)
-                  } else {
-                    setShowFaceRegistration(true)
-                  }
-                }}
-                style={{
-                  background: faceRegistered ? '#10b981' : '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.75rem 1.5rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                {faceRegistered ? '📷 Face Check-in' : '👤 Register Face'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Teacher Dashboard */}
+        {/* TEACHER DASHBOARD */}
         {user.role === 'teacher' && (
           <div style={{
             background: 'white',
@@ -253,59 +172,173 @@ function Dashboard({ user, onLogout }) {
             borderRadius: '12px',
             border: '2px solid #a78bfa'
           }}>
-            <h3 style={{ color: '#7c3aed', marginTop: 0 }}>👨‍🏫 Teacher Dashboard</h3>
+            <h2 style={{ color: '#7c3aed', marginTop: 0 }}>👨‍🏫 Teacher Dashboard</h2>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginTop: '1.5rem' }}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+              gap: '1.5rem', 
+              marginBottom: '2rem' 
+            }}>
               <div style={{ padding: '1rem', background: '#f3e8ff', borderRadius: '8px' }}>
                 <h4>📋 Current Class</h4>
                 <p><strong>Subject:</strong> Computer Science</p>
                 <p><strong>Students:</strong> 45 enrolled</p>
-                <p><strong>Present:</strong> 38 (84%)</p>
+                <p><strong>Time:</strong> 3:00 PM - 4:00 PM</p>
               </div>
 
               <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '8px' }}>
-                <h4>⏰ Real-time Attendance</h4>
-                <p>✅ 38 students marked present</p>
-                <p>⏳ 7 students not yet marked</p>
-                <p>🕐 Class started 15 min ago</p>
+                <h4>⏰ Quick Stats</h4>
+                <p>📊 Today's Classes: 4</p>
+                <p>✅ Average Attendance: 85%</p>
+                <p>🚀 Methods: QR + Face Recognition</p>
               </div>
             </div>
 
-            <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
-              <button 
+            <div style={{
+              background: '#f0f9ff',
+              padding: '1.5rem',
+              borderRadius: '8px',
+              marginBottom: '2rem',
+              border: '1px solid #bfdbfe'
+            }}>
+              <h3 style={{ margin: '0 0 1rem 0', color: '#1e40af' }}>
+                🎯 Generate Attendance QR Code
+              </h3>
+              <p style={{ margin: '0 0 1rem 0', color: '#374151' }}>
+                Create a QR code for students to scan and mark their attendance for your class.
+              </p>
+              
+              <button
                 onClick={() => setShowQRGenerator(true)}
                 style={{
                   background: '#8b5cf6',
                   color: 'white',
                   border: 'none',
-                  padding: '0.75rem 1.5rem',
+                  padding: '1rem 2rem',
                   borderRadius: '8px',
                   cursor: 'pointer',
+                  fontSize: '1.1rem',
                   fontWeight: 'bold'
                 }}
               >
-                🔍 Generate QR Code
-              </button>
-              
-              <button style={{
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}>
-                📊 View Reports
+                📱 Generate QR Code for Class
               </button>
             </div>
           </div>
         )}
+
+        {/* STUDENT DASHBOARD */}
+        {user.role === 'student' && (
+          <div style={{
+            background: 'white',
+            padding: '2rem',
+            borderRadius: '12px',
+            border: '2px solid #fbbf24'
+          }}>
+            <h2 style={{ color: '#92400e', marginTop: 0 }}>👨‍🎓 Student Dashboard</h2>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+              gap: '1.5rem', 
+              marginBottom: '2rem' 
+            }}>
+              <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '8px' }}>
+                <h4>📅 Today's Schedule</h4>
+                <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                  <li>9:00 AM - Mathematics</li>
+                  <li>11:00 AM - Physics</li>
+                  <li>2:00 PM - Free Period</li>
+                  <li>3:00 PM - Computer Science</li>
+                </ul>
+              </div>
+
+              <div style={{ padding: '1rem', background: '#ecfdf5', borderRadius: '8px' }}>
+                <h4>📊 Attendance Stats</h4>
+                <p>📈 This Week: 90% attended</p>
+                <p>✅ Classes Present: 18/20</p>
+                <p>🎯 Target: 85% minimum</p>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#f0f9ff',
+              padding: '1.5rem',
+              borderRadius: '8px',
+              marginBottom: '2rem',
+              border: '1px solid #bfdbfe'
+            }}>
+              <h3 style={{ margin: '0 0 1rem 0', color: '#1e40af' }}>
+                📱 Mark Your Attendance
+              </h3>
+              <p style={{ margin: '0 0 1.5rem 0', color: '#374151' }}>
+                Choose your preferred method to mark attendance for class.
+              </p>
+              
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                <button 
+                  onClick={() => setShowQRScanner(true)}
+                  style={{
+                    background: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    padding: '1rem 2rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}
+                >
+                  📱 Scan Teacher's QR Code
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    if (faceRegistered) {
+                      setShowFaceAttendance(true)
+                    } else {
+                      setShowFaceRegistration(true)
+                    }
+                  }}
+                  style={{
+                    background: faceRegistered ? '#10b981' : '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    padding: '1rem 2rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '1rem'
+                  }}
+                >
+                  {faceRegistered ? '📷 Face Recognition Check-in' : '👤 Register Face First'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ACCESS DENIED */}
+        {!['teacher', 'student'].includes(user.role) && (
+          <div style={{
+            background: 'white',
+            padding: '2rem',
+            borderRadius: '12px',
+            border: '2px solid #ef4444',
+            textAlign: 'center'
+          }}>
+            <h2 style={{ color: '#dc2626' }}>❌ Access Denied</h2>
+            <p>Your role ({user.role}) does not have access to this dashboard.</p>
+            <p>Please contact your administrator for proper role assignment.</p>
+          </div>
+        )}
       </div>
 
-      {/* Modals */}
+      {/* MODALS */}
       {showQRScanner && (
         <QRScanner 
+          user={user}
           onScanSuccess={handleQRScanSuccess}
           onClose={() => setShowQRScanner(false)}
         />
@@ -313,6 +346,7 @@ function Dashboard({ user, onLogout }) {
 
       {showQRGenerator && (
         <QRGenerator 
+          user={user}
           onClose={() => setShowQRGenerator(false)}
         />
       )}
