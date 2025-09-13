@@ -26,15 +26,9 @@ function FaceRegistration({ user, onComplete, onClose }) {
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
       await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
       
+      console.log('✅ Models loaded successfully')
       setMessage('📹 Starting camera...')
       await startCamera()
-      setIsLoading(false)
-      setMessage('👤 Position your face in the frame and click "Capture"')
-      
-      // Start face detection
-      setTimeout(() => {
-        detectFace()
-      }, 1000)
       
     } catch (error) {
       console.error('Error loading models:', error)
@@ -54,6 +48,35 @@ function FaceRegistration({ user, onComplete, onClose }) {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        
+        // CRITICAL: Add event listeners before play
+        videoRef.current.onloadedmetadata = async () => {
+          try {
+            console.log('📹 Video metadata loaded, starting playback...')
+            
+            // CRITICAL: Explicitly play the video
+            await videoRef.current.play()
+            console.log('✅ Video playing successfully')
+            
+            setIsLoading(false)
+            setMessage('👤 Position your face in the frame and click "Capture"')
+            
+            // Only start detection after video is confirmed playing
+            setTimeout(() => {
+              detectFace()
+            }, 500)
+            
+          } catch (playError) {
+            console.error('❌ Video play failed:', playError)
+            setMessage('❌ Video play failed. Please refresh and allow autoplay.')
+          }
+        }
+        
+        // Handle video errors
+        videoRef.current.onerror = (error) => {
+          console.error('❌ Video error:', error)
+          setMessage('❌ Video error occurred. Please refresh.')
+        }
       }
     } catch (error) {
       console.error('Camera error:', error)
@@ -72,11 +95,20 @@ function FaceRegistration({ user, onComplete, onClose }) {
     if (!videoRef.current || !canvasRef.current) return
 
     const video = videoRef.current
+    
+    // CRITICAL: Check if video is actually playing
+    if (video.readyState < 2 || video.paused) {
+      console.log('⚠️ Video not ready, retrying...')
+      setTimeout(detectFace, 500)
+      return
+    }
+
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
 
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
+    // Set canvas dimensions based on actual video dimensions
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
 
     const detectFaces = async () => {
       try {
@@ -100,6 +132,10 @@ function FaceRegistration({ user, onComplete, onClose }) {
         }
       } catch (error) {
         console.error('Face detection error:', error)
+        // Continue trying
+        if (!isCapturing) {
+          setTimeout(detectFaces, 100)
+        }
       }
     }
 
@@ -113,6 +149,11 @@ function FaceRegistration({ user, onComplete, onClose }) {
     const video = videoRef.current
 
     try {
+      // Ensure video is playing
+      if (video.paused) {
+        await video.play()
+      }
+
       const detection = await faceapi
         .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
@@ -252,7 +293,13 @@ function FaceRegistration({ user, onComplete, onClose }) {
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '300px', objectFit: 'cover' }}
+                  style={{ 
+                    width: '100%', 
+                    height: '300px', 
+                    objectFit: 'cover',
+                    display: 'block',
+                    backgroundColor: '#000'
+                  }}
                 />
                 <canvas
                   ref={canvasRef}

@@ -10,8 +10,6 @@ function FaceAttendance({ user, onSuccess, onClose }) {
 
   useEffect(() => {
     loadModelsAndStartRecognition()
-    
-    // Cleanup function - automatically stops camera when component unmounts
     return () => {
       stopCamera()
     }
@@ -21,24 +19,18 @@ function FaceAttendance({ user, onSuccess, onClose }) {
     try {
       setMessage('🤖 Loading AI models...')
       
-      // Use CDN for production deployment - works on Vercel
       const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
       
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
       await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
       
+      console.log('✅ Models loaded successfully')
       setMessage('📹 Starting camera...')
       await startCamera()
-      setIsLoading(false)
-      setMessage('👤 Position your face in the frame for attendance marking')
-      
-      // Start recognition after 2 seconds
-      setTimeout(() => {
-        recognizeFace()
-      }, 2000)
       
     } catch (error) {
+      console.error('Models loading error:', error)
       setMessage('❌ Error: ' + error.message)
     }
   }
@@ -55,8 +47,38 @@ function FaceAttendance({ user, onSuccess, onClose }) {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        
+        // CRITICAL: Add event listeners before play
+        videoRef.current.onloadedmetadata = async () => {
+          try {
+            console.log('📹 Video metadata loaded, starting playback...')
+            
+            // CRITICAL: Explicitly play the video
+            await videoRef.current.play()
+            console.log('✅ Video playing successfully')
+            
+            setIsLoading(false)
+            setMessage('👤 Position your face in the frame for attendance marking')
+            
+            // Start recognition after video is confirmed playing
+            setTimeout(() => {
+              recognizeFace()
+            }, 1000)
+            
+          } catch (playError) {
+            console.error('❌ Video play failed:', playError)
+            setMessage('❌ Video play failed. Please refresh and allow autoplay.')
+          }
+        }
+        
+        // Handle video errors
+        videoRef.current.onerror = (error) => {
+          console.error('❌ Video error:', error)
+          setMessage('❌ Video error occurred. Please refresh.')
+        }
       }
     } catch (error) {
+      console.error('Camera error:', error)
       setMessage('❌ Camera access denied. Please allow camera access.')
     }
   }
@@ -73,14 +95,23 @@ function FaceAttendance({ user, onSuccess, onClose }) {
     if (!videoRef.current || !canvasRef.current || isRecognizing) return
 
     const video = videoRef.current
+    
+    // CRITICAL: Check if video is actually playing
+    if (video.readyState < 2 || video.paused) {
+      console.log('⚠️ Video not ready, retrying...')
+      setTimeout(recognizeFace, 500)
+      return
+    }
+
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
 
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
+    // Set canvas dimensions based on actual video dimensions
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
 
     let recognitionAttempts = 0
-    const maxAttempts = 15 // 15 seconds of attempts
+    const maxAttempts = 15
 
     const performRecognition = async () => {
       if (recognitionAttempts >= maxAttempts) {
@@ -102,7 +133,6 @@ function FaceAttendance({ user, onSuccess, onClose }) {
           
           setMessage('🎯 Face detected! Matching with registered data...')
           
-          // Send face descriptor to backend for matching
           const faceDescriptor = Array.from(detection.descriptor)
           await matchFaceWithBackend(faceDescriptor)
           
@@ -151,8 +181,6 @@ function FaceAttendance({ user, onSuccess, onClose }) {
 
       if (result.success && result.match) {
         setMessage('✅ Face recognized! Marking attendance...')
-        
-        // Mark attendance using face recognition
         await markAttendance(result.data)
         
       } else if (result.success && !result.match) {
@@ -163,6 +191,7 @@ function FaceAttendance({ user, onSuccess, onClose }) {
       }
       
     } catch (error) {
+      console.error('Backend match error:', error)
       setMessage('❌ Connection error: ' + error.message)
     }
     
@@ -194,10 +223,7 @@ function FaceAttendance({ user, onSuccess, onClose }) {
 
       if (result.success) {
         setMessage('🎉 Attendance marked successfully!')
-        
-        // Stop camera after successful attendance marking
         setTimeout(() => {
-          stopCamera()
           onSuccess(result)
         }, 1500)
       } else {
@@ -234,10 +260,7 @@ function FaceAttendance({ user, onSuccess, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ margin: 0 }}>📷 Face Recognition Attendance</h2>
           <button 
-            onClick={() => {
-              stopCamera()  // Stop camera when closing
-              onClose()
-            }} 
+            onClick={onClose}
             style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
           >
             ✕
@@ -264,7 +287,13 @@ function FaceAttendance({ user, onSuccess, onClose }) {
                 autoPlay
                 playsInline
                 muted
-                style={{ width: '100%', height: '400px', objectFit: 'cover' }}
+                style={{ 
+                  width: '100%', 
+                  height: '400px', 
+                  objectFit: 'cover',
+                  display: 'block',
+                  backgroundColor: '#000'
+                }}
               />
               <canvas
                 ref={canvasRef}
@@ -300,10 +329,7 @@ function FaceAttendance({ user, onSuccess, onClose }) {
                 </button>
 
                 <button
-                  onClick={() => {
-                    stopCamera()  // Stop camera when switching to QR
-                    onClose()
-                  }}
+                  onClick={onClose}
                   style={{
                     background: '#6b7280',
                     color: 'white',
