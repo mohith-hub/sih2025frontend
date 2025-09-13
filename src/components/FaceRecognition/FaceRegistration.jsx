@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import * as faceapi from 'face-api.js'
 
-function FaceRegistration({ user, onComplete, onClose }) {
+function FaceAttendance({ user, onSuccess, onClose }) {
   const [message, setMessage] = useState('Loading...')
-  const [capturedImages, setCapturedImages] = useState([])
+  const [isRecognizing, setIsRecognizing] = useState(false)
   const videoRef = useRef()
   const streamRef = useRef()
 
@@ -14,7 +14,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
 
   const startEverything = async () => {
     try {
-      console.log('🔄 Starting camera...')
+      console.log('🔄 Starting camera for attendance...')
       setMessage('Starting camera...')
       
       // Get camera stream first
@@ -23,19 +23,25 @@ function FaceRegistration({ user, onComplete, onClose }) {
         audio: false
       })
       
-      console.log('✅ Got camera stream:', stream)
+      console.log('✅ Got camera stream for attendance:', stream)
       streamRef.current = stream
       
       // Set video source
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        console.log('✅ Set video srcObject')
+        console.log('✅ Set video srcObject for attendance')
         
         // Force play
         try {
           await videoRef.current.play()
-          console.log('✅ Video is playing')
-          setMessage('Camera ready! Click Capture to take a photo')
+          console.log('✅ Video is playing for attendance')
+          setMessage('Position your face for attendance marking')
+          
+          // Load models and start recognition
+          setTimeout(() => {
+            loadModelsAndRecognize()
+          }, 1000)
+          
         } catch (playError) {
           console.error('❌ Video play error:', playError)
           setMessage('Video play failed: ' + playError.message)
@@ -48,33 +54,113 @@ function FaceRegistration({ user, onComplete, onClose }) {
     }
   }
 
-  const capturePhoto = () => {
-    if (!videoRef.current) return
-    
-    const video = videoRef.current
-    const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    
-    const ctx = canvas.getContext('2d')
-    ctx.drawImage(video, 0, 0)
-    
-    const imageData = canvas.toDataURL('image/jpeg')
-    
-    const newCapture = {
-      id: Date.now(),
-      imageData
+  const loadModelsAndRecognize = async () => {
+    try {
+      setMessage('Loading AI models...')
+      
+      const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
+      
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
+      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+      
+      console.log('✅ Models loaded for attendance')
+      setMessage('AI models ready. Position your face for recognition...')
+      
+      // Start recognition
+      setTimeout(() => {
+        startRecognition()
+      }, 500)
+      
+    } catch (error) {
+      console.error('❌ Model loading error:', error)
+      setMessage('Model loading failed: ' + error.message)
     }
-    
-    setCapturedImages(prev => [...prev, newCapture])
-    setMessage(`Captured ${capturedImages.length + 1} photos!`)
   }
 
-  const registerPhotos = async () => {
-    setMessage('Registering...')
+  const startRecognition = async () => {
+    if (!videoRef.current || isRecognizing) return
     
+    setIsRecognizing(true)
+    setMessage('Scanning your face...')
+    
+    let attempts = 0
+    const maxAttempts = 10
+    
+    const recognitionLoop = async () => {
+      if (attempts >= maxAttempts) {
+        setMessage('Recognition timeout. Please try again.')
+        setIsRecognizing(false)
+        return
+      }
+      
+      try {
+        const video = videoRef.current
+        const detection = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor()
+        
+        if (detection) {
+          console.log('✅ Face detected for attendance!')
+          setMessage('Face detected! Checking registration...')
+          
+          const faceDescriptor = Array.from(detection.descriptor)
+          await matchFaceWithBackend(faceDescriptor)
+          return
+        }
+        
+        attempts++
+        setMessage(`Looking for your face... (${attempts}/${maxAttempts})`)
+        
+        setTimeout(recognitionLoop, 1000)
+        
+      } catch (error) {
+        console.error('Recognition error:', error)
+        attempts++
+        setTimeout(recognitionLoop, 1000)
+      }
+    }
+    
+    recognitionLoop()
+  }
+
+  const matchFaceWithBackend = async (faceDescriptor) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/face/register`, {
+      setMessage('Matching with registered data...')
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/face/recognize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          faceDescriptor,
+          studentId: user.id
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success && result.match) {
+        setMessage('Face recognized! Marking attendance...')
+        await markAttendance(result.data)
+      } else {
+        setMessage('Face not recognized. Please try again or use QR code.')
+        setIsRecognizing(false)
+      }
+      
+    } catch (error) {
+      console.error('Backend error:', error)
+      setMessage('Connection error: ' + error.message)
+      setIsRecognizing(false)
+    }
+  }
+
+  const markAttendance = async (recognitionData) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/attendance/mark`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -82,28 +168,49 @@ function FaceRegistration({ user, onComplete, onClose }) {
         },
         body: JSON.stringify({
           studentId: user.id,
-          studentName: user.name,
-          faceData: capturedImages
+          method: 'face',
+          faceRecognitionData: {
+            confidence: recognitionData?.confidence || 0.85,
+            matchedAt: new Date().toISOString(),
+            studentName: user.name,
+            recognitionId: `face_${Date.now()}`,
+            originalData: recognitionData
+          }
         })
       })
-      
+
       const result = await response.json()
-      
+
       if (result.success) {
-        setMessage('✅ Registration successful!')
-        setTimeout(() => onComplete(result), 1500)
+        setMessage('🎉 Attendance marked successfully!')
+        setTimeout(() => {
+          cleanup()
+          onSuccess(result)
+        }, 1500)
       } else {
-        setMessage('❌ Registration failed: ' + result.message)
+        setMessage('Attendance marking failed: ' + result.message)
+        setIsRecognizing(false)
       }
+      
     } catch (error) {
-      setMessage('❌ Error: ' + error.message)
+      console.error('Attendance error:', error)
+      setMessage('Failed to mark attendance: ' + error.message)
+      setIsRecognizing(false)
     }
   }
 
   const cleanup = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
     }
+  }
+
+  const retryRecognition = () => {
+    setIsRecognizing(false)
+    setTimeout(() => {
+      startRecognition()
+    }, 500)
   }
 
   return (
@@ -130,7 +237,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
         
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0 }}>📷 Face Registration</h2>
+          <h2 style={{ margin: 0 }}>📷 Face Recognition Attendance</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>
             ×
           </button>
@@ -139,7 +246,8 @@ function FaceRegistration({ user, onComplete, onClose }) {
         {/* Message */}
         <div style={{
           padding: '10px',
-          background: '#f0f0f0',
+          background: message.includes('successfully') ? '#d4edda' : 
+                     message.includes('failed') || message.includes('error') ? '#f8d7da' : '#f0f0f0',
           borderRadius: '5px',
           marginBottom: '20px',
           textAlign: 'center',
@@ -162,18 +270,34 @@ function FaceRegistration({ user, onComplete, onClose }) {
               borderRadius: '5px',
               objectFit: 'cover'
             }}
-            onPlay={() => console.log('📹 Video playing event')}
-            onError={(e) => console.error('📹 Video error:', e)}
-            onLoadedMetadata={() => console.log('📹 Video metadata loaded')}
+            onPlay={() => console.log('📹 Attendance video playing')}
+            onError={(e) => console.error('📹 Attendance video error:', e)}
+            onLoadedMetadata={() => console.log('📹 Attendance video metadata loaded')}
           />
         </div>
 
         {/* Controls */}
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '10px' }}>
           <button
-            onClick={capturePhoto}
+            onClick={retryRecognition}
+            disabled={isRecognizing}
             style={{
-              background: '#0066cc',
+              background: isRecognizing ? '#6c757d' : '#0066cc',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '5px',
+              cursor: isRecognizing ? 'not-allowed' : 'pointer',
+              flex: 1
+            }}
+          >
+            {isRecognizing ? 'Recognizing...' : '🔄 Try Again'}
+          </button>
+
+          <button
+            onClick={onClose}
+            style={{
+              background: '#6c757d',
               color: 'white',
               border: 'none',
               padding: '10px 20px',
@@ -182,50 +306,13 @@ function FaceRegistration({ user, onComplete, onClose }) {
               flex: 1
             }}
           >
-            📸 Take Photo ({capturedImages.length}/3)
+            Use QR Code Instead
           </button>
-
-          {capturedImages.length >= 1 && (
-            <button
-              onClick={registerPhotos}
-              style={{
-                background: '#00cc66',
-                color: 'white',
-                border: 'none',
-                padding: '10px 20px',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                flex: 1
-              }}
-            >
-              ✅ Register
-            </button>
-          )}
         </div>
-
-        {/* Captured Photos */}
-        {capturedImages.length > 0 && (
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            {capturedImages.map((img, index) => (
-              <img
-                key={img.id}
-                src={img.imageData}
-                alt={`Photo ${index + 1}`}
-                style={{
-                  width: '60px',
-                  height: '60px',
-                  objectFit: 'cover',
-                  borderRadius: '5px',
-                  border: '2px solid #00cc66'
-                }}
-              />
-            ))}
-          </div>
-        )}
 
       </div>
     </div>
   )
 }
 
-export default FaceRegistration
+export default FaceAttendance
