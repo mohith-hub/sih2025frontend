@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import Login from './components/Auth/Login'
 import QRScanner from './components/Attendance/QRScanner'
 import QRGenerator from './components/Attendance/QRGenerator'
+import FaceRegistration from './components/FaceRecognition/FaceRegistration'
+import FaceAttendance from './components/FaceRecognition/FaceAttendance'
 
 // Use environment variable for API URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
@@ -12,12 +14,48 @@ function Dashboard({ user, onLogout }) {
   const [showQRGenerator, setShowQRGenerator] = useState(false)
   const [attendanceMessage, setAttendanceMessage] = useState('')
 
+  // Face Recognition States
+  const [showFaceRegistration, setShowFaceRegistration] = useState(false)
+  const [showFaceAttendance, setShowFaceAttendance] = useState(false)
+  const [faceRegistered, setFaceRegistered] = useState(false)
+
   useEffect(() => {
     fetch(`${API_BASE_URL}/health`)
       .then(res => res.json())
       .then(data => setBackendStatus(`✅ ${data.message}`))
       .catch(() => setBackendStatus('❌ Backend not connected'))
   }, [])
+
+  useEffect(() => {
+    if (user) {
+      checkFaceRegistration()
+    }
+  }, [user])
+
+  const checkFaceRegistration = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/face/registered`)
+      const result = await response.json()
+      
+      if (result.success) {
+        const userRegistered = result.data.some(student => student.studentId === user.id)
+        setFaceRegistered(userRegistered)
+      }
+    } catch (error) {
+      console.error('Error checking face registration:', error)
+    }
+  }
+
+  const handleFaceRegistrationComplete = (data) => {
+    setFaceRegistered(true)
+    setShowFaceRegistration(false)
+    setAttendanceMessage('✅ Face registration completed! You can now use face recognition for attendance.')
+  }
+
+  const handleFaceAttendanceSuccess = (result) => {
+    setShowFaceAttendance(false)
+    setAttendanceMessage(`✅ Attendance marked via face recognition! ${result.classInfo ? `(${result.classInfo.presentCount}/${result.classInfo.totalCount} present)` : ''}`)
+  }
 
   const handleQRScanSuccess = async (qrData) => {
     setShowQRScanner(false)
@@ -87,7 +125,7 @@ function Dashboard({ user, onLogout }) {
         <div style={{
           padding: '1rem 2rem',
           background: attendanceMessage.includes('✅') ? '#dcfce7' : '#fee2e2',
-          borderBottom: `2px solid ${attendanceMessage.includes('✅') ? '#16a34a' : '#dc2626'}`
+          borderBottom: attendanceMessage.includes('✅') ? '2px solid #16a34a' : '2px solid #dc2626'
         }}>
           <div style={{
             maxWidth: '1200px',
@@ -120,6 +158,7 @@ function Dashboard({ user, onLogout }) {
             <h3 style={{ color: '#1e40af', marginTop: 0 }}>🔄 System Status</h3>
             <p><strong>Backend:</strong> {backendStatus}</p>
             <p><strong>User:</strong> ✅ Authenticated as {user.role}</p>
+            <p><strong>Face Recognition:</strong> {faceRegistered ? '✅ Registered' : '⏳ Not Registered'}</p>
           </div>
 
           <div style={{
@@ -131,6 +170,7 @@ function Dashboard({ user, onLogout }) {
             <h3 style={{ color: '#166534', marginTop: 0 }}>📊 Today's Stats</h3>
             <p><strong>Classes:</strong> 4 scheduled</p>
             <p><strong>Attendance:</strong> 85% average</p>
+            <p><strong>Methods:</strong> QR Code + Face Recognition</p>
           </div>
         </div>
 
@@ -165,7 +205,7 @@ function Dashboard({ user, onLogout }) {
               </div>
             </div>
 
-            <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
+            <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <button 
                 onClick={() => setShowQRScanner(true)}
                 style={{
@@ -181,16 +221,25 @@ function Dashboard({ user, onLogout }) {
                 📱 Scan QR Code
               </button>
               
-              <button style={{
-                background: '#10b981',
-                color: 'white',
-                border: 'none',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontWeight: 'bold'
-              }}>
-                📷 Face Check-in
+              <button 
+                onClick={() => {
+                  if (faceRegistered) {
+                    setShowFaceAttendance(true)
+                  } else {
+                    setShowFaceRegistration(true)
+                  }
+                }}
+                style={{
+                  background: faceRegistered ? '#10b981' : '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                {faceRegistered ? '📷 Face Check-in' : '👤 Register Face'}
               </button>
             </div>
           </div>
@@ -265,6 +314,22 @@ function Dashboard({ user, onLogout }) {
       {showQRGenerator && (
         <QRGenerator 
           onClose={() => setShowQRGenerator(false)}
+        />
+      )}
+
+      {showFaceRegistration && (
+        <FaceRegistration
+          user={user}
+          onComplete={handleFaceRegistrationComplete}
+          onClose={() => setShowFaceRegistration(false)}
+        />
+      )}
+
+      {showFaceAttendance && (
+        <FaceAttendance
+          user={user}
+          onSuccess={handleFaceAttendanceSuccess}
+          onClose={() => setShowFaceAttendance(false)}
         />
       )}
     </div>
