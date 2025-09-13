@@ -21,51 +21,31 @@ function FaceRegistration({ user, onComplete, onClose }) {
     try {
       setMessage('🤖 Loading AI models...')
       
-      // Use CDN with timeout
       const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
       
-      console.log('Loading models from CDN...')
-      
-      // Load models with proper error handling
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
       ])
       
-      console.log('✅ Models loaded successfully!')
       setMessage('📹 Starting camera...')
-      
-      // Wait a bit then start camera
-      setTimeout(async () => {
-        await startCamera()
-        setIsLoading(false)
-        setMessage('👤 Position your face in the frame and click "Capture"')
-        
-        // Start detection after camera is ready
-        setTimeout(() => {
-          detectFace()
-        }, 1000)
-      }, 500)
+      await startCamera()
       
     } catch (error) {
-      console.error('❌ Error loading models:', error)
-      setMessage('❌ Error loading models. Please refresh and try again.')
+      console.error('Error:', error)
+      setMessage('❌ Error: ' + error.message)
     }
   }
 
   const startCamera = async () => {
     try {
-      console.log('🎥 Requesting camera access...')
-      
-      // Simplified video constraints for better browser compatibility
       const constraints = {
         video: {
           width: { ideal: 640, max: 1280 },
           height: { ideal: 480, max: 720 },
           facingMode: 'user'
-        },
-        audio: false
+        }
       }
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
@@ -74,17 +54,26 @@ function FaceRegistration({ user, onComplete, onClose }) {
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         
-        // Wait for video to load
-        return new Promise((resolve) => {
-          videoRef.current.onloadedmetadata = () => {
-            console.log('✅ Camera started successfully!')
-            resolve()
-          }
-        })
+        // Force video to play and ensure it's visible
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play().then(() => {
+            console.log('✅ Video playing successfully')
+            setIsLoading(false)
+            setMessage('👤 Position your face in the frame and click "Capture"')
+            
+            // Start face detection
+            setTimeout(() => {
+              detectFace()
+            }, 1000)
+          }).catch(e => {
+            console.error('Video play error:', e)
+            setMessage('❌ Video playback error. Please refresh and try again.')
+          })
+        }
       }
     } catch (error) {
-      console.error('❌ Camera error:', error)
-      setMessage('❌ Camera access denied. Please allow camera access and refresh.')
+      console.error('Camera error:', error)
+      setMessage('❌ Camera access denied. Please allow camera access.')
     }
   }
 
@@ -104,68 +93,59 @@ function FaceRegistration({ user, onComplete, onClose }) {
     const video = videoRef.current
     const canvas = canvasRef.current
 
-    // Ensure video is playing
-    if (video.paused || video.ended) return
+    // Ensure video is ready
+    if (video.readyState !== 4) {
+      setTimeout(detectFace, 100)
+      return
+    }
 
-    try {
-      // Set canvas dimensions
-      canvas.width = video.videoWidth || 640
-      canvas.height = video.videoHeight || 480
-      
-      const ctx = canvas.getContext('2d')
-      
-      const runDetection = async () => {
-        try {
-          const detection = await faceapi
-            .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }))
-            .withFaceLandmarks()
-            .withFaceDescriptor()
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 480
+    
+    const ctx = canvas.getContext('2d')
 
-          ctx.clearRect(0, 0, canvas.width, canvas.height)
+    const runDetection = async () => {
+      try {
+        const detection = await faceapi
+          .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor()
 
-          if (detection) {
-            // Draw face detection
-            faceapi.draw.drawDetections(canvas, [detection])
-            faceapi.draw.drawFaceLandmarks(canvas, [detection])
-            
-            setMessage('✅ Face detected! Ready to capture.')
-          } else {
-            setMessage('⚠️ Please position your face clearly in the frame.')
-          }
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-        } catch (error) {
-          console.log('Detection error:', error)
+        if (detection) {
+          faceapi.draw.drawDetections(canvas, [detection])
+          faceapi.draw.drawFaceLandmarks(canvas, [detection])
+          setMessage('✅ Face detected! Ready to capture.')
+        } else {
+          setMessage('⚠️ Please position your face in the frame.')
         }
 
-        // Continue detection loop
         if (!isCapturing && streamRef.current) {
           requestAnimationFrame(runDetection)
         }
+      } catch (error) {
+        console.log('Detection error:', error)
       }
-
-      runDetection()
-    } catch (error) {
-      console.error('Face detection setup error:', error)
     }
+
+    runDetection()
   }
 
   const captureFace = async () => {
     if (!videoRef.current || capturedImages.length >= 3) return
 
     setIsCapturing(true)
-    const video = videoRef.current
 
     try {
-      // Wait a moment for stable detection
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
+      const video = videoRef.current
       const detection = await faceapi
         .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor()
 
       if (!detection) {
-        setMessage('❌ No face detected. Please position your face clearly and try again.')
+        setMessage('❌ No face detected. Please position your face clearly.')
         setIsCapturing(false)
         return
       }
@@ -197,7 +177,6 @@ function FaceRegistration({ user, onComplete, onClose }) {
     
     setIsCapturing(false)
     
-    // Resume detection
     setTimeout(() => {
       if (capturedImages.length < 2) {
         detectFace()
@@ -211,22 +190,20 @@ function FaceRegistration({ user, onComplete, onClose }) {
     try {
       setMessage('📡 Registering face data...')
       
-      const registrationData = {
-        studentId: user.id,
-        studentName: user.name,
-        faceData: capturedImages.map(img => ({
-          descriptor: img.descriptor,
-          timestamp: img.timestamp
-        }))
-      }
-
       const response = await fetch(`${import.meta.env.VITE_API_URL}/face/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(registrationData)
+        body: JSON.stringify({
+          studentId: user.id,
+          studentName: user.name,
+          faceData: capturedImages.map(img => ({
+            descriptor: img.descriptor,
+            timestamp: img.timestamp
+          }))
+        })
       })
 
       const result = await response.json()
@@ -295,13 +272,25 @@ function FaceRegistration({ user, onComplete, onClose }) {
 
         {!isLoading && (
           <div>
-            <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', background: '#000', marginBottom: '1rem' }}>
+            <div style={{ 
+              position: 'relative', 
+              borderRadius: '8px', 
+              overflow: 'hidden', 
+              background: '#000',
+              marginBottom: '1rem',
+              aspectRatio: '4/3'
+            }}>
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                style={{ width: '100%', height: '300px', objectFit: 'cover' }}
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover',
+                  display: 'block'
+                }}
               />
               <canvas
                 ref={canvasRef}
@@ -310,7 +299,8 @@ function FaceRegistration({ user, onComplete, onClose }) {
                   top: 0,
                   left: 0,
                   width: '100%',
-                  height: '100%'
+                  height: '100%',
+                  pointerEvents: 'none'
                 }}
               />
             </div>
@@ -325,7 +315,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
                   border: 'none',
                   padding: '0.75rem 1.5rem',
                   borderRadius: '8px',
-                  cursor: isCapturing ? 'not-allowed' : 'pointer',
+                  cursor: isCapturing || capturedImages.length >= 3 ? 'not-allowed' : 'pointer',
                   fontWeight: 'bold',
                   flex: 1
                 }}
@@ -352,7 +342,6 @@ function FaceRegistration({ user, onComplete, onClose }) {
               )}
             </div>
 
-            {/* Captured Images Preview */}
             {capturedImages.length > 0 && (
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                 {capturedImages.map((img, index) => (
@@ -360,7 +349,13 @@ function FaceRegistration({ user, onComplete, onClose }) {
                     key={img.id}
                     src={img.imageData} 
                     alt={`Capture ${index + 1}`}
-                    style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', border: '2px solid #10b981' }}
+                    style={{ 
+                      width: '60px', 
+                      height: '60px', 
+                      objectFit: 'cover', 
+                      borderRadius: '8px', 
+                      border: '2px solid #10b981' 
+                    }}
                   />
                 ))}
               </div>
