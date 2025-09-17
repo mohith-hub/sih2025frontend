@@ -5,19 +5,21 @@ import QRGenerator from './components/Attendance/QRGenerator'
 import FaceRegistration from './components/FaceRecognition/FaceRegistration'
 import FaceAttendance from './components/FaceRecognition/FaceAttendance'
 
-// Use environment variable for API URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 function Dashboard({ user, onLogout }) {
   const [backendStatus, setBackendStatus] = useState('Checking...')
+  const [attendanceMessage, setAttendanceMessage] = useState('')
+  
+  // Modal states
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [showQRGenerator, setShowQRGenerator] = useState(false)
-  const [attendanceMessage, setAttendanceMessage] = useState('')
-
-  // Face Recognition States
   const [showFaceRegistration, setShowFaceRegistration] = useState(false)
   const [showFaceAttendance, setShowFaceAttendance] = useState(false)
+  
+  // Face registration states
   const [faceRegistered, setFaceRegistered] = useState(false)
+  const [checkingFaceReg, setCheckingFaceReg] = useState(false)
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/health`)
@@ -28,38 +30,95 @@ function Dashboard({ user, onLogout }) {
 
   useEffect(() => {
     if (user && user.role === 'student') {
-      checkFaceRegistration()
+      checkFaceRegistrationStatus()
     }
   }, [user])
 
-  const checkFaceRegistration = async () => {
+  const checkFaceRegistrationStatus = async () => {
+    setCheckingFaceReg(true)
+    setFaceRegistered(false) // Reset to false first
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/face/registered`)
-      const result = await response.json()
+      console.log('🔍 Checking face registration for user ID:', user.id)
       
-      if (result.success) {
-        const userRegistered = result.data.some(student => student.studentId === user.id)
-        setFaceRegistered(userRegistered)
+      const response = await fetch(`${API_BASE_URL}/face/registered/${user.id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+
+      console.log('📥 Response status:', response.status)
+
+      if (response.status === 200) {
+        const result = await response.json()
+        console.log('📥 Response data:', result)
+        
+        if (result.success && result.data && result.data.faceData && result.data.faceData.length > 0) {
+          console.log('✅ Face data found - user is registered')
+          setFaceRegistered(true)
+        } else {
+          console.log('❌ No valid face data found')
+          setFaceRegistered(false)
+        }
+      } else if (response.status === 404) {
+        console.log('❌ User not found in face database - not registered')
+        setFaceRegistered(false)
+      } else {
+        console.log('❌ Unexpected response status:', response.status)
+        setFaceRegistered(false)
       }
     } catch (error) {
-      console.error('Error checking face registration:', error)
+      console.error('❌ Error checking face registration:', error)
+      setFaceRegistered(false)
+    } finally {
+      setCheckingFaceReg(false)
     }
   }
 
+  // ✅ CORRECT FACE BUTTON LOGIC
+  const handleFaceButtonClick = () => {
+    console.log('👤 Face button clicked')
+    console.log('🔍 Current faceRegistered state:', faceRegistered)
+    console.log('🔍 Current checking state:', checkingFaceReg)
+    
+    if (checkingFaceReg) {
+      console.log('⏳ Still checking registration status, please wait...')
+      return
+    }
+    
+    if (faceRegistered) {
+      console.log('✅ User is registered → Opening Face Attendance')
+      setShowFaceAttendance(true)
+    } else {
+      console.log('📝 User is NOT registered → Opening Face Registration')
+      setShowFaceRegistration(true)
+    }
+  }
+
+  // Force registration (for debugging)
+  const forceRegistration = () => {
+    console.log('🔧 Force opening registration')
+    setFaceRegistered(false)
+    setShowFaceAttendance(false) // Make sure attendance modal is closed
+    setShowFaceRegistration(true) // Force open registration
+  }
+
   const handleFaceRegistrationComplete = (data) => {
+    console.log('✅ Face registration completed:', data)
     setFaceRegistered(true)
     setShowFaceRegistration(false)
-    setAttendanceMessage('✅ Face registration completed! You can now use face recognition for attendance.')
+    setAttendanceMessage('✅ Face registration completed successfully! You can now use face recognition.')
   }
 
   const handleFaceAttendanceSuccess = (result) => {
+    console.log('✅ Face attendance success:', result)
     setShowFaceAttendance(false)
-    setAttendanceMessage(`✅ Attendance marked via face recognition! ${result.classInfo ? `(${result.classInfo.presentCount}/${result.classInfo.totalCount} present)` : ''}`)
+    setAttendanceMessage('✅ Attendance marked via face recognition!')
   }
 
   const handleQRScanSuccess = async (qrData) => {
     setShowQRScanner(false)
-    
     try {
       const response = await fetch(`${API_BASE_URL}/attendance/mark`, {
         method: 'POST',
@@ -75,9 +134,8 @@ function Dashboard({ user, onLogout }) {
       })
 
       const result = await response.json()
-      
       if (result.success) {
-        setAttendanceMessage(`✅ Attendance marked for ${qrData.className}! Teacher: ${qrData.teacherName}`)
+        setAttendanceMessage(`✅ Attendance marked for ${qrData.className}!`)
       } else {
         setAttendanceMessage(`❌ ${result.message}`)
       }
@@ -97,24 +155,15 @@ function Dashboard({ user, onLogout }) {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <h1 style={{ color: '#2563eb', margin: 0 }}>
-          🎓 Smart Attendance System
-        </h1>
+        <h1 style={{ color: '#2563eb', margin: 0 }}>🎓 Smart Attendance System</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <span style={{ color: '#64748b' }}>
             Welcome, <strong>{user.name}</strong> ({user.role})
           </span>
-          <button
-            onClick={onLogout}
-            style={{
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: '6px',
-              cursor: 'pointer'
-            }}
-          >
+          <button onClick={onLogout} style={{
+            background: '#ef4444', color: 'white', border: 'none',
+            padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer'
+          }}>
             Logout
           </button>
         </div>
@@ -128,19 +177,13 @@ function Dashboard({ user, onLogout }) {
           borderBottom: attendanceMessage.includes('✅') ? '2px solid #16a34a' : '2px solid #dc2626'
         }}>
           <div style={{
-            maxWidth: '1200px',
-            margin: '0 auto',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
+            maxWidth: '1200px', margin: '0 auto', display: 'flex',
+            justifyContent: 'space-between', alignItems: 'center'
           }}>
             <span>{attendanceMessage}</span>
-            <button
-              onClick={() => setAttendanceMessage('')}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
-            >
-              ✕
-            </button>
+            <button onClick={() => setAttendanceMessage('')} style={{
+              background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem'
+            }}>✕</button>
           </div>
         </div>
       )}
@@ -148,194 +191,124 @@ function Dashboard({ user, onLogout }) {
       {/* Main Content */}
       <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
         
-        {/* System Status Card */}
+        {/* System Status */}
         <div style={{
-          background: 'white',
-          padding: '1.5rem',
-          borderRadius: '12px',
-          border: '2px solid #bfdbfe',
-          marginBottom: '2rem'
+          background: 'white', padding: '1.5rem', borderRadius: '12px',
+          border: '2px solid #bfdbfe', marginBottom: '2rem'
         }}>
           <h3 style={{ color: '#1e40af', marginTop: 0 }}>🔄 System Status</h3>
           <p><strong>Backend:</strong> {backendStatus}</p>
           <p><strong>User:</strong> ✅ Authenticated as {user.role}</p>
           {user.role === 'student' && (
-            <p><strong>Face Recognition:</strong> {faceRegistered ? '✅ Registered' : '⏳ Not Registered'}</p>
+            <div>
+              <p><strong>Face Recognition:</strong> {
+                checkingFaceReg ? '🔄 Checking...' : 
+                faceRegistered ? '✅ Registered' : '❌ Not Registered'
+              }</p>
+              
+              {/* Debug Info */}
+              <div style={{
+                background: '#f8fafc', padding: '0.5rem', borderRadius: '4px',
+                fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem'
+              }}>
+                <strong>Debug:</strong> faceRegistered={faceRegistered.toString()}, 
+                checking={checkingFaceReg.toString()}
+              </div>
+            </div>
           )}
         </div>
 
         {/* TEACHER DASHBOARD */}
         {user.role === 'teacher' && (
           <div style={{
-            background: 'white',
-            padding: '2rem',
-            borderRadius: '12px',
+            background: 'white', padding: '2rem', borderRadius: '12px',
             border: '2px solid #a78bfa'
           }}>
             <h2 style={{ color: '#7c3aed', marginTop: 0 }}>👨‍🏫 Teacher Dashboard</h2>
             
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-              gap: '1.5rem', 
-              marginBottom: '2rem' 
+            <button onClick={() => setShowQRGenerator(true)} style={{
+              background: '#8b5cf6', color: 'white', border: 'none',
+              padding: '1rem 2rem', borderRadius: '8px', cursor: 'pointer',
+              fontSize: '1.1rem', fontWeight: 'bold'
             }}>
-              <div style={{ padding: '1rem', background: '#f3e8ff', borderRadius: '8px' }}>
-                <h4>📋 Current Class</h4>
-                <p><strong>Subject:</strong> Computer Science</p>
-                <p><strong>Students:</strong> 45 enrolled</p>
-                <p><strong>Time:</strong> 3:00 PM - 4:00 PM</p>
-              </div>
-
-              <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '8px' }}>
-                <h4>⏰ Quick Stats</h4>
-                <p>📊 Today's Classes: 4</p>
-                <p>✅ Average Attendance: 85%</p>
-                <p>🚀 Methods: QR + Face Recognition</p>
-              </div>
-            </div>
-
-            <div style={{
-              background: '#f0f9ff',
-              padding: '1.5rem',
-              borderRadius: '8px',
-              marginBottom: '2rem',
-              border: '1px solid #bfdbfe'
-            }}>
-              <h3 style={{ margin: '0 0 1rem 0', color: '#1e40af' }}>
-                🎯 Generate Attendance QR Code
-              </h3>
-              <p style={{ margin: '0 0 1rem 0', color: '#374151' }}>
-                Create a QR code for students to scan and mark their attendance for your class.
-              </p>
-              
-              <button
-                onClick={() => setShowQRGenerator(true)}
-                style={{
-                  background: '#8b5cf6',
-                  color: 'white',
-                  border: 'none',
-                  padding: '1rem 2rem',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '1.1rem',
-                  fontWeight: 'bold'
-                }}
-              >
-                📱 Generate QR Code for Class
-              </button>
-            </div>
+              📱 Generate QR Code for Class
+            </button>
           </div>
         )}
 
         {/* STUDENT DASHBOARD */}
         {user.role === 'student' && (
           <div style={{
-            background: 'white',
-            padding: '2rem',
-            borderRadius: '12px',
+            background: 'white', padding: '2rem', borderRadius: '12px',
             border: '2px solid #fbbf24'
           }}>
             <h2 style={{ color: '#92400e', marginTop: 0 }}>👨‍🎓 Student Dashboard</h2>
             
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-              gap: '1.5rem', 
-              marginBottom: '2rem' 
-            }}>
-              <div style={{ padding: '1rem', background: '#fef3c7', borderRadius: '8px' }}>
-                <h4>📅 Today's Schedule</h4>
-                <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                  <li>9:00 AM - Mathematics</li>
-                  <li>11:00 AM - Physics</li>
-                  <li>2:00 PM - Free Period</li>
-                  <li>3:00 PM - Computer Science</li>
-                </ul>
-              </div>
-
-              <div style={{ padding: '1rem', background: '#ecfdf5', borderRadius: '8px' }}>
-                <h4>📊 Attendance Stats</h4>
-                <p>📈 This Week: 90% attended</p>
-                <p>✅ Classes Present: 18/20</p>
-                <p>🎯 Target: 85% minimum</p>
-              </div>
-            </div>
-
-            <div style={{
-              background: '#f0f9ff',
-              padding: '1.5rem',
-              borderRadius: '8px',
-              marginBottom: '2rem',
-              border: '1px solid #bfdbfe'
-            }}>
-              <h3 style={{ margin: '0 0 1rem 0', color: '#1e40af' }}>
-                📱 Mark Your Attendance
-              </h3>
-              <p style={{ margin: '0 0 1.5rem 0', color: '#374151' }}>
-                Choose your preferred method to mark attendance for class.
-              </p>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+              <button onClick={() => setShowQRScanner(true)} style={{
+                background: '#3b82f6', color: 'white', border: 'none',
+                padding: '1rem 2rem', borderRadius: '8px', cursor: 'pointer',
+                fontWeight: 'bold', fontSize: '1rem'
+              }}>
+                📱 Scan Teacher's QR Code
+              </button>
               
-              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <button 
-                  onClick={() => setShowQRScanner(true)}
-                  style={{
-                    background: '#3b82f6',
-                    color: 'white',
-                    border: 'none',
-                    padding: '1rem 2rem',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}
-                >
-                  📱 Scan Teacher's QR Code
-                </button>
-                
-                <button 
-                  onClick={() => {
-                    if (faceRegistered) {
-                      setShowFaceAttendance(true)
-                    } else {
-                      setShowFaceRegistration(true)
-                    }
-                  }}
-                  style={{
-                    background: faceRegistered ? '#10b981' : '#f59e0b',
-                    color: 'white',
-                    border: 'none',
-                    padding: '1rem 2rem',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    fontSize: '1rem'
-                  }}
-                >
-                  {faceRegistered ? '📷 Face Recognition Check-in' : '👤 Register Face First'}
-                </button>
-              </div>
+              <button 
+                onClick={handleFaceButtonClick}
+                disabled={checkingFaceReg}
+                style={{
+                  background: checkingFaceReg ? '#9ca3af' : 
+                            faceRegistered ? '#10b981' : '#f59e0b',
+                  color: 'white', border: 'none',
+                  padding: '1rem 2rem', borderRadius: '8px',
+                  cursor: checkingFaceReg ? 'not-allowed' : 'pointer',
+                  fontWeight: 'bold', fontSize: '1rem'
+                }}
+              >
+                {checkingFaceReg ? '🔄 Checking...' :
+                 faceRegistered ? '📷 Face Check-in' : '👤 Register Face'}
+              </button>
+              
+              {/* Debug/Force button */}
+              <button onClick={forceRegistration} style={{
+                background: '#ef4444', color: 'white', border: 'none',
+                padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}>
+                🔧 Force Register
+              </button>
             </div>
-          </div>
-        )}
 
-        {/* ACCESS DENIED */}
-        {!['teacher', 'student'].includes(user.role) && (
-          <div style={{
-            background: 'white',
-            padding: '2rem',
-            borderRadius: '12px',
-            border: '2px solid #ef4444',
-            textAlign: 'center'
-          }}>
-            <h2 style={{ color: '#dc2626' }}>❌ Access Denied</h2>
-            <p>Your role ({user.role}) does not have access to this dashboard.</p>
-            <p>Please contact your administrator for proper role assignment.</p>
+            {/* Clear buttons for debugging */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button onClick={() => {
+                console.log('🧹 Clearing all face data')
+                fetch(`${API_BASE_URL}/face/clear-all`, { method: 'DELETE' })
+                  .then(() => {
+                    setFaceRegistered(false)
+                    alert('All face data cleared')
+                  })
+              }} style={{
+                background: '#dc2626', color: 'white', border: 'none',
+                padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}>
+                🗑️ Clear All Face Data
+              </button>
+              
+              <button onClick={checkFaceRegistrationStatus} style={{
+                background: '#0ea5e9', color: 'white', border: 'none',
+                padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}>
+                🔄 Recheck Registration
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* MODALS */}
+      {/* MODALS - CORRECT CONDITIONAL RENDERING */}
       {showQRScanner && (
         <QRScanner 
           user={user}
@@ -351,6 +324,7 @@ function Dashboard({ user, onLogout }) {
         />
       )}
 
+      {/* ✅ FACE REGISTRATION MODAL */}
       {showFaceRegistration && (
         <FaceRegistration
           user={user}
@@ -359,6 +333,7 @@ function Dashboard({ user, onLogout }) {
         />
       )}
 
+      {/* ✅ FACE ATTENDANCE MODAL */}
       {showFaceAttendance && (
         <FaceAttendance
           user={user}
@@ -370,6 +345,7 @@ function Dashboard({ user, onLogout }) {
   )
 }
 
+// Rest of App component remains the same...
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -397,11 +373,8 @@ function App() {
   if (loading) {
     return (
       <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        fontSize: '1.2rem'
+        display: 'flex', justifyContent: 'center', alignItems: 'center', 
+        height: '100vh', fontSize: '1.2rem'
       }}>
         Loading...
       </div>
