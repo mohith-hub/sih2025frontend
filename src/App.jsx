@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Login from './components/Auth/Login'
 import QRScanner from './components/Attendance/QRScanner'
 import QRGenerator from './components/Attendance/QRGenerator'
+import StudentDetailsForm from './components/FaceRecognition/StudentDetailsForm'
 import FaceRegistration from './components/FaceRecognition/FaceRegistration'
 import FaceAttendance from './components/FaceRecognition/FaceAttendance'
 import './styles/responsive.css'
@@ -11,12 +12,18 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 function Dashboard({ user, onLogout }) {
   const [backendStatus, setBackendStatus] = useState('Checking...')
   const [attendanceMessage, setAttendanceMessage] = useState('')
+  
+  // Modal states
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [showQRGenerator, setShowQRGenerator] = useState(false)
+  const [showStudentDetailsForm, setShowStudentDetailsForm] = useState(false)
   const [showFaceRegistration, setShowFaceRegistration] = useState(false)
   const [showFaceAttendance, setShowFaceAttendance] = useState(false)
+  
+  // Face registration states
   const [faceRegistered, setFaceRegistered] = useState(false)
   const [checkingFaceReg, setCheckingFaceReg] = useState(false)
+  const [studentData, setStudentData] = useState(null)
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/health`)
@@ -56,20 +63,49 @@ function Dashboard({ user, onLogout }) {
 
   const handleFaceButtonClick = () => {
     if (checkingFaceReg) return
-    faceRegistered ? setShowFaceAttendance(true) : setShowFaceRegistration(true)
+    
+    if (faceRegistered) {
+      // If face is already registered, go directly to attendance
+      setShowFaceAttendance(true)
+    } else {
+      // If not registered, show student details form first
+      setShowStudentDetailsForm(true)
+    }
   }
 
   const forceRegistration = () => {
     setFaceRegistered(false)
     setShowFaceAttendance(false)
+    setStudentData(null)
+    // Show student details form for re-registration
+    setShowStudentDetailsForm(true)
+  }
+
+  // Handle student details form completion
+  const handleStudentDetailsProceed = (details) => {
+    setStudentData(details)
+    setShowStudentDetailsForm(false)
     setShowFaceRegistration(true)
+  }
+
+  // Handle student details form cancellation
+  const handleStudentDetailsCancel = () => {
+    setShowStudentDetailsForm(false)
+    setStudentData(null)
   }
 
   const handleFaceRegistrationComplete = (data) => {
     setFaceRegistered(true)
     setShowFaceRegistration(false)
-    setAttendanceMessage('✅ Face registration completed successfully!')
+    const studentName = studentData?.name || 'student'
+    setStudentData(null) // Clear student data after successful registration
+    setAttendanceMessage(`✅ Face registration completed successfully for ${studentName}!`)
     setTimeout(() => setAttendanceMessage(''), 5000)
+  }
+
+  const handleFaceRegistrationClose = () => {
+    setShowFaceRegistration(false)
+    setStudentData(null) // Clear student data if registration is cancelled
   }
 
   const handleFaceAttendanceSuccess = (result) => {
@@ -341,7 +377,7 @@ function Dashboard({ user, onLogout }) {
         )}
       </main>
 
-      {/* Modals */}
+      {/* Updated Modals with Two-Step Registration Flow */}
       {showQRScanner && (
         <QRScanner 
           user={user}
@@ -357,14 +393,27 @@ function Dashboard({ user, onLogout }) {
         />
       )}
 
-      {showFaceRegistration && (
-        <FaceRegistration
-          user={user}
-          onComplete={handleFaceRegistrationComplete}
-          onClose={() => setShowFaceRegistration(false)}
+      {/* Step 1: Student Details Form */}
+      {showStudentDetailsForm && (
+        <StudentDetailsForm
+          onProceed={handleStudentDetailsProceed}
+          onCancel={handleStudentDetailsCancel}
         />
       )}
 
+      {/* Step 2: Face Registration (only shown after student details are completed) */}
+      {showFaceRegistration && studentData && (
+        <FaceRegistration
+          user={{
+            ...user,
+            ...studentData // Merge user data with student details for registration
+          }}
+          onComplete={handleFaceRegistrationComplete}
+          onClose={handleFaceRegistrationClose}
+        />
+      )}
+
+      {/* Face Attendance (for already registered users) */}
       {showFaceAttendance && (
         <FaceAttendance
           user={user}
