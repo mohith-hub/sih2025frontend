@@ -4,6 +4,7 @@ import QRScanner from './components/Attendance/QRScanner'
 import QRGenerator from './components/Attendance/QRGenerator'
 import FaceRegistration from './components/FaceRecognition/FaceRegistration'
 import FaceAttendance from './components/FaceRecognition/FaceAttendance'
+import './styles/responsive.css' // Import our universal CSS
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
@@ -36,11 +37,9 @@ function Dashboard({ user, onLogout }) {
 
   const checkFaceRegistrationStatus = async () => {
     setCheckingFaceReg(true)
-    setFaceRegistered(false) // Reset to false first
+    setFaceRegistered(false)
     
     try {
-      console.log('🔍 Checking face registration for user ID:', user.id)
-      
       const response = await fetch(`${API_BASE_URL}/face/registered/${user.id}`, {
         method: 'GET',
         headers: {
@@ -48,71 +47,46 @@ function Dashboard({ user, onLogout }) {
         }
       })
 
-      console.log('📥 Response status:', response.status)
-
       if (response.status === 200) {
         const result = await response.json()
-        console.log('📥 Response data:', result)
-        
         if (result.success && result.data && result.data.faceData && result.data.faceData.length > 0) {
-          console.log('✅ Face data found - user is registered')
           setFaceRegistered(true)
         } else {
-          console.log('❌ No valid face data found')
           setFaceRegistered(false)
         }
-      } else if (response.status === 404) {
-        console.log('❌ User not found in face database - not registered')
-        setFaceRegistered(false)
       } else {
-        console.log('❌ Unexpected response status:', response.status)
         setFaceRegistered(false)
       }
     } catch (error) {
-      console.error('❌ Error checking face registration:', error)
       setFaceRegistered(false)
     } finally {
       setCheckingFaceReg(false)
     }
   }
 
-  // ✅ CORRECT FACE BUTTON LOGIC
   const handleFaceButtonClick = () => {
-    console.log('👤 Face button clicked')
-    console.log('🔍 Current faceRegistered state:', faceRegistered)
-    console.log('🔍 Current checking state:', checkingFaceReg)
-    
-    if (checkingFaceReg) {
-      console.log('⏳ Still checking registration status, please wait...')
-      return
-    }
+    if (checkingFaceReg) return
     
     if (faceRegistered) {
-      console.log('✅ User is registered → Opening Face Attendance')
       setShowFaceAttendance(true)
     } else {
-      console.log('📝 User is NOT registered → Opening Face Registration')
       setShowFaceRegistration(true)
     }
   }
 
-  // Force registration (for debugging)
   const forceRegistration = () => {
-    console.log('🔧 Force opening registration')
     setFaceRegistered(false)
-    setShowFaceAttendance(false) // Make sure attendance modal is closed
-    setShowFaceRegistration(true) // Force open registration
+    setShowFaceAttendance(false)
+    setShowFaceRegistration(true)
   }
 
   const handleFaceRegistrationComplete = (data) => {
-    console.log('✅ Face registration completed:', data)
     setFaceRegistered(true)
     setShowFaceRegistration(false)
-    setAttendanceMessage('✅ Face registration completed successfully! You can now use face recognition.')
+    setAttendanceMessage('✅ Face registration completed successfully!')
   }
 
   const handleFaceAttendanceSuccess = (result) => {
-    console.log('✅ Face attendance success:', result)
     setShowFaceAttendance(false)
     setAttendanceMessage('✅ Attendance marked via face recognition!')
   }
@@ -145,170 +119,226 @@ function Dashboard({ user, onLogout }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      {/* Navigation */}
-      <nav style={{
-        background: 'white',
-        padding: '1rem 2rem',
-        borderBottom: '2px solid #e2e8f0',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
+    <div className="animate-fade-in" style={{ minHeight: '100vh', backgroundColor: 'var(--background)' }}>
+      {/* Universal Responsive Navigation */}
+      <nav className="bg-surface shadow" style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+        borderBottom: '1px solid var(--border)'
       }}>
-        <h1 style={{ color: '#2563eb', margin: 0 }}>🎓 Smart Attendance System</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ color: '#64748b' }}>
-            Welcome, <strong>{user.name}</strong> ({user.role})
-          </span>
-          <button onClick={onLogout} style={{
-            background: '#ef4444', color: 'white', border: 'none',
-            padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer'
-          }}>
-            Logout
-          </button>
+        <div className="container">
+          <div className="flex items-center justify-between" style={{ minHeight: '64px' }}>
+            {/* Logo/Title - Responsive */}
+            <div className="flex items-center gap-3">
+              <div className="text-2xl">🎓</div>
+              <h1 className="font-bold text-primary m-0" style={{
+                fontSize: 'clamp(1.1rem, 4vw, 1.5rem)'
+              }}>
+                <span className="hidden-mobile">Smart Attendance System</span>
+                <span className="block-mobile hidden-desktop">Smart Attendance</span>
+              </h1>
+            </div>
+
+            {/* User Info - Responsive */}
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden-mobile">
+                <div className="font-medium text-sm">{user.name}</div>
+                <div className="text-xs text-secondary">({user.role})</div>
+              </div>
+              <div className="block-mobile hidden-desktop">
+                <div className="font-medium text-xs">{user.name}</div>
+              </div>
+              <button 
+                onClick={onLogout}
+                className="btn btn-danger btn-sm"
+              >
+                <span className="hidden-mobile">Logout</span>
+                <span className="block-mobile hidden-desktop">🚪</span>
+              </button>
+            </div>
+          </div>
         </div>
       </nav>
 
-      {/* Attendance Message */}
+      {/* Universal Success/Error Messages */}
       {attendanceMessage && (
-        <div style={{
-          padding: '1rem 2rem',
-          background: attendanceMessage.includes('✅') ? '#dcfce7' : '#fee2e2',
-          borderBottom: attendanceMessage.includes('✅') ? '2px solid #16a34a' : '2px solid #dc2626'
-        }}>
-          <div style={{
-            maxWidth: '1200px', margin: '0 auto', display: 'flex',
-            justifyContent: 'space-between', alignItems: 'center'
-          }}>
-            <span>{attendanceMessage}</span>
-            <button onClick={() => setAttendanceMessage('')} style={{
-              background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem'
-            }}>✕</button>
+        <div 
+          className="animate-fade-in"
+          style={{
+            padding: 'var(--space-4)',
+            backgroundColor: attendanceMessage.includes('✅') ? '#dcfce7' : '#fee2e2',
+            borderBottom: `2px solid ${attendanceMessage.includes('✅') ? '#16a34a' : '#dc2626'}`,
+            color: attendanceMessage.includes('✅') ? '#166534' : '#dc2626'
+          }}
+        >
+          <div className="container">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>{attendanceMessage}</span>
+              </div>
+              <button
+                onClick={() => setAttendanceMessage('')}
+                className="btn btn-sm"
+                style={{ 
+                  background: 'none', 
+                  color: 'inherit',
+                  minHeight: 'var(--touch-target)',
+                  minWidth: 'var(--touch-target)'
+                }}
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Main Content */}
-      <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* Universal Responsive Content */}
+      <main className="container" style={{ paddingTop: 'var(--space-6)', paddingBottom: 'var(--space-6)' }}>
         
-        {/* System Status */}
-        <div style={{
-          background: 'white', padding: '1.5rem', borderRadius: '12px',
-          border: '2px solid #bfdbfe', marginBottom: '2rem'
-        }}>
-          <h3 style={{ color: '#1e40af', marginTop: 0 }}>🔄 System Status</h3>
-          <p><strong>Backend:</strong> {backendStatus}</p>
-          <p><strong>User:</strong> ✅ Authenticated as {user.role}</p>
-          {user.role === 'student' && (
-            <div>
-              <p><strong>Face Recognition:</strong> {
-                checkingFaceReg ? '🔄 Checking...' : 
-                faceRegistered ? '✅ Registered' : '❌ Not Registered'
-              }</p>
-              
-              {/* Debug Info */}
-              <div style={{
-                background: '#f8fafc', padding: '0.5rem', borderRadius: '4px',
-                fontSize: '0.8rem', color: '#6b7280', marginTop: '0.5rem'
-              }}>
-                <strong>Debug:</strong> faceRegistered={faceRegistered.toString()}, 
-                checking={checkingFaceReg.toString()}
+        {/* System Status Card - Universal */}
+        <div className="card mb-6 animate-fade-in">
+          <div className="card-body">
+            <h3 className="text-primary mb-4">🔄 System Status</h3>
+            <div className="grid grid-cols-1 gap-3">
+              <div className="flex items-center gap-2">
+                <strong className="text-sm">Backend:</strong>
+                <span className="text-sm">{backendStatus}</span>
               </div>
+              <div className="flex items-center gap-2">
+                <strong className="text-sm">User:</strong>
+                <span className="text-sm">✅ Authenticated as {user.role}</span>
+              </div>
+              {user.role === 'student' && (
+                <div className="flex items-center gap-2">
+                  <strong className="text-sm">Face Recognition:</strong>
+                  <span className="text-sm">
+                    {checkingFaceReg ? '🔄 Checking...' : 
+                     faceRegistered ? '✅ Registered' : '❌ Not Registered'}
+                  </span>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* TEACHER DASHBOARD */}
+        {/* TEACHER DASHBOARD - Universal Responsive */}
         {user.role === 'teacher' && (
-          <div style={{
-            background: 'white', padding: '2rem', borderRadius: '12px',
-            border: '2px solid #a78bfa'
-          }}>
-            <h2 style={{ color: '#7c3aed', marginTop: 0 }}>👨‍🏫 Teacher Dashboard</h2>
-            
-            <button onClick={() => setShowQRGenerator(true)} style={{
-              background: '#8b5cf6', color: 'white', border: 'none',
-              padding: '1rem 2rem', borderRadius: '8px', cursor: 'pointer',
-              fontSize: '1.1rem', fontWeight: 'bold'
-            }}>
-              📱 Generate QR Code for Class
-            </button>
+          <div className="card animate-fade-in" style={{ borderColor: '#a78bfa' }}>
+            <div className="card-body">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="text-3xl">👨‍🏫</span>
+                <h2 className="text-primary m-0">Teacher Dashboard</h2>
+              </div>
+              
+              <div className="card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #bfdbfe' }}>
+                <div className="card-body">
+                  <h3 className="text-primary mb-3">🎯 Generate QR Code</h3>
+                  <p className="text-secondary mb-4 text-sm">
+                    Create a QR code for students to scan and mark their attendance for your class.
+                  </p>
+                  
+                  <button
+                    onClick={() => setShowQRGenerator(true)}
+                    className="btn btn-primary btn-full btn-lg"
+                  >
+                    📱 Generate QR Code for Class
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* STUDENT DASHBOARD */}
+        {/* STUDENT DASHBOARD - Universal Responsive */}
         {user.role === 'student' && (
-          <div style={{
-            background: 'white', padding: '2rem', borderRadius: '12px',
-            border: '2px solid #fbbf24'
-          }}>
-            <h2 style={{ color: '#92400e', marginTop: 0 }}>👨‍🎓 Student Dashboard</h2>
-            
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-              <button onClick={() => setShowQRScanner(true)} style={{
-                background: '#3b82f6', color: 'white', border: 'none',
-                padding: '1rem 2rem', borderRadius: '8px', cursor: 'pointer',
-                fontWeight: 'bold', fontSize: '1rem'
-              }}>
-                📱 Scan Teacher's QR Code
-              </button>
+          <div className="card animate-fade-in" style={{ borderColor: '#fbbf24' }}>
+            <div className="card-body">
+              <div className="flex items-center gap-3 mb-6">
+                <span className="text-3xl">👨‍🎓</span>
+                <h2 className="text-warning m-0" style={{ color: '#92400e' }}>Student Dashboard</h2>
+              </div>
               
-              <button 
-                onClick={handleFaceButtonClick}
-                disabled={checkingFaceReg}
-                style={{
-                  background: checkingFaceReg ? '#9ca3af' : 
-                            faceRegistered ? '#10b981' : '#f59e0b',
-                  color: 'white', border: 'none',
-                  padding: '1rem 2rem', borderRadius: '8px',
-                  cursor: checkingFaceReg ? 'not-allowed' : 'pointer',
-                  fontWeight: 'bold', fontSize: '1rem'
-                }}
-              >
-                {checkingFaceReg ? '🔄 Checking...' :
-                 faceRegistered ? '📷 Face Check-in' : '👤 Register Face'}
-              </button>
-              
-              {/* Debug/Force button */}
-              <button onClick={forceRegistration} style={{
-                background: '#ef4444', color: 'white', border: 'none',
-                padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer',
-                fontSize: '0.8rem'
-              }}>
-                🔧 Force Register
-              </button>
-            </div>
-
-            {/* Clear buttons for debugging */}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={() => {
-                console.log('🧹 Clearing all face data')
-                fetch(`${API_BASE_URL}/face/clear-all`, { method: 'DELETE' })
-                  .then(() => {
-                    setFaceRegistered(false)
-                    alert('All face data cleared')
-                  })
-              }} style={{
-                background: '#dc2626', color: 'white', border: 'none',
-                padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer',
-                fontSize: '0.8rem'
-              }}>
-                🗑️ Clear All Face Data
-              </button>
-              
-              <button onClick={checkFaceRegistrationStatus} style={{
-                background: '#0ea5e9', color: 'white', border: 'none',
-                padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer',
-                fontSize: '0.8rem'
-              }}>
-                🔄 Recheck Registration
-              </button>
+              <div className="card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #bfdbfe' }}>
+                <div className="card-body">
+                  <h3 className="text-primary mb-3">📱 Mark Your Attendance</h3>
+                  <p className="text-secondary mb-4 text-sm">
+                    Choose your preferred method to mark attendance for class.
+                  </p>
+                  
+                  {/* Main Action Buttons */}
+                  <div className="grid grid-cols-1 gap-3 mb-4">
+                    <button 
+                      onClick={() => setShowQRScanner(true)} 
+                      className="btn btn-primary btn-full btn-lg"
+                    >
+                      📱 Scan Teacher's QR Code
+                    </button>
+                    
+                    <button 
+                      onClick={handleFaceButtonClick}
+                      disabled={checkingFaceReg}
+                      className={`btn btn-full btn-lg ${
+                        checkingFaceReg ? '' : 
+                        faceRegistered ? 'btn-secondary' : 'btn-warning'
+                      }`}
+                      style={{
+                        backgroundColor: checkingFaceReg ? 'var(--text-secondary)' : undefined,
+                        cursor: checkingFaceReg ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {checkingFaceReg ? '🔄 Checking Registration...' :
+                       faceRegistered ? '📷 Face Recognition Check-in' : '👤 Register Face First'}
+                    </button>
+                  </div>
+                  
+                  {/* Debug/Test Controls */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={forceRegistration} 
+                      className="btn btn-danger btn-sm"
+                    >
+                      🔧 Force Register
+                    </button>
+                    
+                    <button 
+                      onClick={() => {
+                        fetch(`${API_BASE_URL}/face/clear-all`, { method: 'DELETE' })
+                          .then(() => {
+                            setFaceRegistered(false)
+                            alert('All face data cleared')
+                          })
+                      }} 
+                      className="btn btn-danger btn-sm"
+                    >
+                      🗑️ Clear Data
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* MODALS - CORRECT CONDITIONAL RENDERING */}
+        {/* Access Denied - Universal */}
+        {!['teacher', 'student'].includes(user.role) && (
+          <div className="card animate-fade-in" style={{ borderColor: '#ef4444' }}>
+            <div className="card-body text-center">
+              <div className="text-4xl mb-4">❌</div>
+              <h2 className="text-danger mb-3">Access Denied</h2>
+              <p className="text-secondary">
+                Your role ({user.role}) does not have access to this dashboard.
+              </p>
+              <p className="text-secondary text-sm">
+                Please contact your administrator for proper role assignment.
+              </p>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Universal Modals - Will be styled responsively */}
       {showQRScanner && (
         <QRScanner 
           user={user}
@@ -324,7 +354,6 @@ function Dashboard({ user, onLogout }) {
         />
       )}
 
-      {/* ✅ FACE REGISTRATION MODAL */}
       {showFaceRegistration && (
         <FaceRegistration
           user={user}
@@ -333,7 +362,6 @@ function Dashboard({ user, onLogout }) {
         />
       )}
 
-      {/* ✅ FACE ATTENDANCE MODAL */}
       {showFaceAttendance && (
         <FaceAttendance
           user={user}
@@ -345,7 +373,7 @@ function Dashboard({ user, onLogout }) {
   )
 }
 
-// Rest of App component remains the same...
+// Universal Responsive App Component
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -372,11 +400,19 @@ function App() {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', justifyContent: 'center', alignItems: 'center', 
-        height: '100vh', fontSize: '1.2rem'
-      }}>
-        Loading...
+      <div className="flex items-center justify-center" style={{ height: '100vh' }}>
+        <div className="text-center">
+          <div 
+            className="animate-spin rounded-full border-4 border-primary mb-4"
+            style={{ 
+              width: '60px', 
+              height: '60px',
+              borderTopColor: 'transparent',
+              margin: '0 auto'
+            }}
+          />
+          <p className="text-lg font-medium">Loading Smart Attendance System...</p>
+        </div>
       </div>
     )
   }
