@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import * as faceapi from 'face-api.js'
-import '../../styles/resposive.css'
+import '../../styles/responsive.css'
 function FaceRegistration({ user, onComplete, onClose }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isCapturing, setIsCapturing] = useState(false)
