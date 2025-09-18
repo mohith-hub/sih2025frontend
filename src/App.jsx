@@ -4,29 +4,25 @@ import QRScanner from './components/Attendance/QRScanner'
 import QRGenerator from './components/Attendance/QRGenerator'
 import FaceRegistration from './components/FaceRecognition/FaceRegistration'
 import FaceAttendance from './components/FaceRecognition/FaceAttendance'
-import './styles/responsive.css' // Import our universal CSS
+import './styles/responsive.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
 
 function Dashboard({ user, onLogout }) {
   const [backendStatus, setBackendStatus] = useState('Checking...')
   const [attendanceMessage, setAttendanceMessage] = useState('')
-  
-  // Modal states
   const [showQRScanner, setShowQRScanner] = useState(false)
   const [showQRGenerator, setShowQRGenerator] = useState(false)
   const [showFaceRegistration, setShowFaceRegistration] = useState(false)
   const [showFaceAttendance, setShowFaceAttendance] = useState(false)
-  
-  // Face registration states
   const [faceRegistered, setFaceRegistered] = useState(false)
   const [checkingFaceReg, setCheckingFaceReg] = useState(false)
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/health`)
       .then(res => res.json())
-      .then(data => setBackendStatus(`✅ ${data.message}`))
-      .catch(() => setBackendStatus('❌ Backend not connected'))
+      .then(data => setBackendStatus(`Smart Attendance API with Face Recognition is running!`))
+      .catch(() => setBackendStatus('Backend not connected'))
   }, [])
 
   useEffect(() => {
@@ -42,23 +38,17 @@ function Dashboard({ user, onLogout }) {
     try {
       const response = await fetch(`${API_BASE_URL}/face/registered/${user.id}`, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
 
       if (response.status === 200) {
         const result = await response.json()
         if (result.success && result.data && result.data.faceData && result.data.faceData.length > 0) {
           setFaceRegistered(true)
-        } else {
-          setFaceRegistered(false)
         }
-      } else {
-        setFaceRegistered(false)
       }
     } catch (error) {
-      setFaceRegistered(false)
+      console.error('Face registration check failed:', error)
     } finally {
       setCheckingFaceReg(false)
     }
@@ -66,12 +56,7 @@ function Dashboard({ user, onLogout }) {
 
   const handleFaceButtonClick = () => {
     if (checkingFaceReg) return
-    
-    if (faceRegistered) {
-      setShowFaceAttendance(true)
-    } else {
-      setShowFaceRegistration(true)
-    }
+    faceRegistered ? setShowFaceAttendance(true) : setShowFaceRegistration(true)
   }
 
   const forceRegistration = () => {
@@ -84,11 +69,13 @@ function Dashboard({ user, onLogout }) {
     setFaceRegistered(true)
     setShowFaceRegistration(false)
     setAttendanceMessage('✅ Face registration completed successfully!')
+    setTimeout(() => setAttendanceMessage(''), 5000)
   }
 
   const handleFaceAttendanceSuccess = (result) => {
     setShowFaceAttendance(false)
     setAttendanceMessage('✅ Attendance marked via face recognition!')
+    setTimeout(() => setAttendanceMessage(''), 5000)
   }
 
   const handleQRScanSuccess = async (qrData) => {
@@ -100,11 +87,7 @@ function Dashboard({ user, onLogout }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          qrData,
-          studentId: user.id,
-          method: 'qr'
-        })
+        body: JSON.stringify({ qrData, studentId: user.id, method: 'qr' })
       })
 
       const result = await response.json()
@@ -113,137 +96,140 @@ function Dashboard({ user, onLogout }) {
       } else {
         setAttendanceMessage(`❌ ${result.message}`)
       }
+      setTimeout(() => setAttendanceMessage(''), 5000)
     } catch (error) {
       setAttendanceMessage(`❌ Failed to mark attendance: ${error.message}`)
+      setTimeout(() => setAttendanceMessage(''), 5000)
     }
   }
 
   return (
-    <div className="animate-fade-in" style={{ minHeight: '100vh', backgroundColor: 'var(--background)' }}>
-      {/* Universal Responsive Navigation */}
-      <nav className="bg-surface shadow" style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 100,
-        borderBottom: '1px solid var(--border)'
-      }}>
+    <div className="animate-fade-in">
+      {/* Award-Winning Navigation */}
+      <nav className="navbar">
         <div className="container">
-          <div className="flex items-center justify-between" style={{ minHeight: '64px' }}>
-            {/* Logo/Title - Responsive */}
-            <div className="flex items-center gap-3">
-              <div className="text-2xl">🎓</div>
-              <h1 className="font-bold text-primary m-0" style={{
-                fontSize: 'clamp(1.1rem, 4vw, 1.5rem)'
-              }}>
-                <span className="hidden-mobile">Smart Attendance System</span>
-                <span className="block-mobile hidden-desktop">Smart Attendance</span>
-              </h1>
-            </div>
-
-            {/* User Info - Responsive */}
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden-mobile">
-                <div className="font-medium text-sm">{user.name}</div>
-                <div className="text-xs text-secondary">({user.role})</div>
-              </div>
-              <div className="block-mobile hidden-desktop">
-                <div className="font-medium text-xs">{user.name}</div>
+          <div className="navbar-container">
+            <a href="#" className="navbar-brand">
+              <span>🎓</span>
+              <span>Smart Attendance</span>
+            </a>
+            
+            <div className="navbar-user">
+              <div className="navbar-user-info">
+                <div className="navbar-user-name">{user.name}</div>
+                <div className="navbar-user-role">{user.role}</div>
               </div>
               <button 
                 onClick={onLogout}
-                className="btn btn-danger btn-sm"
+                className="btn btn-danger"
+                style={{ minWidth: 'auto', padding: '0.5rem 1rem' }}
               >
-                <span className="hidden-mobile">Logout</span>
-                <span className="block-mobile hidden-desktop">🚪</span>
+                <span style={{ display: 'none' }} className="hidden">Logout</span>
+                <span style={{ fontSize: '1.2rem' }}>🚪</span>
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Universal Success/Error Messages */}
+      {/* Toast Notifications */}
       {attendanceMessage && (
-        <div 
-          className="animate-fade-in"
-          style={{
-            padding: 'var(--space-4)',
-            backgroundColor: attendanceMessage.includes('✅') ? '#dcfce7' : '#fee2e2',
-            borderBottom: `2px solid ${attendanceMessage.includes('✅') ? '#16a34a' : '#dc2626'}`,
-            color: attendanceMessage.includes('✅') ? '#166534' : '#dc2626'
-          }}
-        >
-          <div className="container">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span>{attendanceMessage}</span>
-              </div>
-              <button
-                onClick={() => setAttendanceMessage('')}
-                className="btn btn-sm"
-                style={{ 
-                  background: 'none', 
-                  color: 'inherit',
-                  minHeight: 'var(--touch-target)',
-                  minWidth: 'var(--touch-target)'
-                }}
-              >
-                ✕
-              </button>
-            </div>
+        <div className={`toast ${attendanceMessage.includes('✅') ? 'toast-success' : 'toast-error'} animate-fade-in`}>
+          <div className="flex items-center justify-between gap-4">
+            <span>{attendanceMessage}</span>
+            <button
+              onClick={() => setAttendanceMessage('')}
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                color: 'inherit',
+                cursor: 'pointer',
+                fontSize: '1.2rem',
+                minHeight: '32px',
+                minWidth: '32px'
+              }}
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
 
-      {/* Universal Responsive Content */}
-      <main className="container" style={{ paddingTop: 'var(--space-6)', paddingBottom: 'var(--space-6)' }}>
+      {/* Main Content */}
+      <main className="container" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-8)' }}>
         
-        {/* System Status Card - Universal */}
-        <div className="card mb-6 animate-fade-in">
+        {/* System Status Card */}
+        <div className="card mb-8 animate-fade-in">
           <div className="card-body">
-            <h3 className="text-primary mb-4">🔄 System Status</h3>
-            <div className="grid grid-cols-1 gap-3">
-              <div className="flex items-center gap-2">
-                <strong className="text-sm">Backend:</strong>
-                <span className="text-sm">{backendStatus}</span>
+            <div className="card-header">
+              <div className="card-icon">🔄</div>
+              <h2 className="card-title">System Status</h2>
+            </div>
+            
+            <div className="grid grid-1 gap-4">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Backend:</span>
+                <div className={`status-indicator ${backendStatus.includes('running') ? 'status-success' : 'status-danger'}`}>
+                  {backendStatus.includes('running') ? '✅' : '❌'} {backendStatus}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <strong className="text-sm">User:</strong>
-                <span className="text-sm">✅ Authenticated as {user.role}</span>
+              
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Authentication:</span>
+                <div className="status-indicator status-success">
+                  ✅ Authenticated as {user.role}
+                </div>
               </div>
+              
               {user.role === 'student' && (
-                <div className="flex items-center gap-2">
-                  <strong className="text-sm">Face Recognition:</strong>
-                  <span className="text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Face Recognition:</span>
+                  <div className={`status-indicator ${
+                    checkingFaceReg ? 'status-info' : 
+                    faceRegistered ? 'status-success' : 'status-warning'
+                  }`}>
                     {checkingFaceReg ? '🔄 Checking...' : 
-                     faceRegistered ? '✅ Registered' : '❌ Not Registered'}
-                  </span>
+                     faceRegistered ? '✅ Registered' : '⚠️ Not Registered'}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* TEACHER DASHBOARD - Universal Responsive */}
+        {/* Teacher Dashboard */}
         {user.role === 'teacher' && (
-          <div className="card animate-fade-in" style={{ borderColor: '#a78bfa' }}>
+          <div className="card animate-fade-in">
             <div className="card-body">
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-3xl">👨‍🏫</span>
-                <h2 className="text-primary m-0">Teacher Dashboard</h2>
+              <div className="card-header">
+                <div className="card-icon">👨‍🏫</div>
+                <h2 className="card-title">Teacher Dashboard</h2>
               </div>
               
-              <div className="card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #bfdbfe' }}>
+              <div className="card" style={{ 
+                background: 'linear-gradient(135deg, rgba(1, 126, 110, 0.1), rgba(0, 164, 147, 0.05))',
+                border: '1px solid rgba(1, 126, 110, 0.3)',
+                marginBottom: 0
+              }}>
                 <div className="card-body">
-                  <h3 className="text-primary mb-3">🎯 Generate QR Code</h3>
-                  <p className="text-secondary mb-4 text-sm">
-                    Create a QR code for students to scan and mark their attendance for your class.
+                  <h3 style={{ color: 'var(--accent-light)', marginBottom: 'var(--space-4)' }}>
+                    🎯 Generate QR Code
+                  </h3>
+                  <p style={{ 
+                    color: 'var(--text-secondary)', 
+                    marginBottom: 'var(--space-6)',
+                    lineHeight: 1.6 
+                  }}>
+                    Create a secure QR code for students to scan and mark their attendance. 
+                    Each QR code is unique to your class session.
                   </p>
                   
                   <button
                     onClick={() => setShowQRGenerator(true)}
-                    className="btn btn-primary btn-full btn-lg"
+                    className="btn btn-primary btn-lg btn-full"
                   >
-                    📱 Generate QR Code for Class
+                    <span>📱</span>
+                    <span>Generate QR Code for Class</span>
                   </button>
                 </div>
               </div>
@@ -251,55 +237,70 @@ function Dashboard({ user, onLogout }) {
           </div>
         )}
 
-        {/* STUDENT DASHBOARD - Universal Responsive */}
+        {/* Student Dashboard */}
         {user.role === 'student' && (
-          <div className="card animate-fade-in" style={{ borderColor: '#fbbf24' }}>
+          <div className="card animate-fade-in">
             <div className="card-body">
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-3xl">👨‍🎓</span>
-                <h2 className="text-warning m-0" style={{ color: '#92400e' }}>Student Dashboard</h2>
+              <div className="card-header">
+                <div className="card-icon">👨‍🎓</div>
+                <h2 className="card-title">Student Dashboard</h2>
               </div>
               
-              <div className="card" style={{ backgroundColor: '#f0f9ff', border: '1px solid #bfdbfe' }}>
+              <div className="card" style={{ 
+                background: 'linear-gradient(135deg, rgba(1, 126, 110, 0.1), rgba(0, 164, 147, 0.05))',
+                border: '1px solid rgba(1, 126, 110, 0.3)',
+                marginBottom: 0
+              }}>
                 <div className="card-body">
-                  <h3 className="text-primary mb-3">📱 Mark Your Attendance</h3>
-                  <p className="text-secondary mb-4 text-sm">
-                    Choose your preferred method to mark attendance for class.
+                  <h3 style={{ color: 'var(--accent-light)', marginBottom: 'var(--space-4)' }}>
+                    📱 Mark Your Attendance
+                  </h3>
+                  <p style={{ 
+                    color: 'var(--text-secondary)', 
+                    marginBottom: 'var(--space-6)',
+                    lineHeight: 1.6 
+                  }}>
+                    Choose your preferred method to mark attendance. Face recognition provides 
+                    a faster, contactless experience.
                   </p>
                   
-                  {/* Main Action Buttons */}
-                  <div className="grid grid-cols-1 gap-3 mb-4">
+                  <div className="grid grid-1 gap-4 mb-6">
                     <button 
                       onClick={() => setShowQRScanner(true)} 
-                      className="btn btn-primary btn-full btn-lg"
+                      className="btn btn-primary btn-lg"
                     >
-                      📱 Scan Teacher's QR Code
+                      <span>📱</span>
+                      <span>Scan Teacher's QR Code</span>
                     </button>
                     
                     <button 
                       onClick={handleFaceButtonClick}
                       disabled={checkingFaceReg}
-                      className={`btn btn-full btn-lg ${
-                        checkingFaceReg ? '' : 
-                        faceRegistered ? 'btn-secondary' : 'btn-warning'
+                      className={`btn btn-lg ${
+                        checkingFaceReg ? 'btn-secondary' : 
+                        faceRegistered ? 'btn-success' : 'btn-warning'
                       }`}
-                      style={{
-                        backgroundColor: checkingFaceReg ? 'var(--text-secondary)' : undefined,
-                        cursor: checkingFaceReg ? 'not-allowed' : 'pointer'
-                      }}
                     >
-                      {checkingFaceReg ? '🔄 Checking Registration...' :
-                       faceRegistered ? '📷 Face Recognition Check-in' : '👤 Register Face First'}
+                      <span>
+                        {checkingFaceReg ? '🔄' :
+                         faceRegistered ? '📷' : '👤'}
+                      </span>
+                      <span>
+                        {checkingFaceReg ? 'Checking Registration...' :
+                         faceRegistered ? 'Face Recognition Check-in' : 'Register Face First'}
+                      </span>
                     </button>
                   </div>
                   
-                  {/* Debug/Test Controls */}
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* Debug Controls */}
+                  <div className="grid grid-2 gap-2">
                     <button 
                       onClick={forceRegistration} 
-                      className="btn btn-danger btn-sm"
+                      className="btn btn-secondary"
+                      style={{ fontSize: 'var(--text-sm)' }}
                     >
-                      🔧 Force Register
+                      <span>🔧</span>
+                      <span>Force Register</span>
                     </button>
                     
                     <button 
@@ -307,12 +308,14 @@ function Dashboard({ user, onLogout }) {
                         fetch(`${API_BASE_URL}/face/clear-all`, { method: 'DELETE' })
                           .then(() => {
                             setFaceRegistered(false)
-                            alert('All face data cleared')
+                            setAttendanceMessage('🗑️ All face data cleared successfully')
                           })
                       }} 
-                      className="btn btn-danger btn-sm"
+                      className="btn btn-danger"
+                      style={{ fontSize: 'var(--text-sm)' }}
                     >
-                      🗑️ Clear Data
+                      <span>🗑️</span>
+                      <span>Clear Data</span>
                     </button>
                   </div>
                 </div>
@@ -321,16 +324,16 @@ function Dashboard({ user, onLogout }) {
           </div>
         )}
 
-        {/* Access Denied - Universal */}
+        {/* Access Denied */}
         {!['teacher', 'student'].includes(user.role) && (
-          <div className="card animate-fade-in" style={{ borderColor: '#ef4444' }}>
+          <div className="card animate-fade-in" style={{ borderColor: 'var(--danger)' }}>
             <div className="card-body text-center">
-              <div className="text-4xl mb-4">❌</div>
-              <h2 className="text-danger mb-3">Access Denied</h2>
-              <p className="text-secondary">
+              <div style={{ fontSize: 'var(--text-4xl)', marginBottom: 'var(--space-6)' }}>❌</div>
+              <h2 style={{ color: 'var(--danger)', marginBottom: 'var(--space-4)' }}>Access Denied</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
                 Your role ({user.role}) does not have access to this dashboard.
               </p>
-              <p className="text-secondary text-sm">
+              <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
                 Please contact your administrator for proper role assignment.
               </p>
             </div>
@@ -338,7 +341,7 @@ function Dashboard({ user, onLogout }) {
         )}
       </main>
 
-      {/* Universal Modals - Will be styled responsively */}
+      {/* Modals */}
       {showQRScanner && (
         <QRScanner 
           user={user}
@@ -373,7 +376,6 @@ function Dashboard({ user, onLogout }) {
   )
 }
 
-// Universal Responsive App Component
 function App() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -400,18 +402,35 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center" style={{ height: '100vh' }}>
-        <div className="text-center">
-          <div 
-            className="animate-spin rounded-full border-4 border-primary mb-4"
-            style={{ 
-              width: '60px', 
-              height: '60px',
-              borderTopColor: 'transparent',
-              margin: '0 auto'
-            }}
-          />
-          <p className="text-lg font-medium">Loading Smart Attendance System...</p>
+      <div className="flex items-center justify-center" style={{ 
+        height: '100vh',
+        background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)'
+      }}>
+        <div className="text-center animate-fade-in">
+          <div className="loading" style={{ 
+            width: '80px', 
+            height: '80px',
+            background: 'linear-gradient(135deg, var(--accent), var(--accent-light))',
+            borderRadius: 'var(--radius-xl)',
+            margin: '0 auto var(--space-6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 'var(--text-2xl)',
+            animation: 'pulse 2s infinite'
+          }}>
+            🎓
+          </div>
+          <h2 style={{ 
+            color: 'var(--text-primary)', 
+            marginBottom: 'var(--space-2)',
+            fontSize: 'var(--text-2xl)'
+          }}>
+            Loading Smart Attendance System
+          </h2>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            Please wait while we initialize the application...
+          </p>
         </div>
       </div>
     )
