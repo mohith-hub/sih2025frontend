@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import * as faceapi from 'face-api.js'
-import '../../styles/responsive.css' // Make sure to import the CSS we created earlier
-
+import '../../styles/resposive.css'
 function FaceRegistration({ user, onComplete, onClose }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isCapturing, setIsCapturing] = useState(false)
@@ -15,7 +14,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
   const streamRef = useRef()
   const detectionInterval = useRef()
 
-  // Universal responsive styles
+  // Optimized responsive styles with laptop sizing
   const styles = {
     overlay: {
       position: 'fixed',
@@ -26,17 +25,17 @@ function FaceRegistration({ user, onComplete, onClose }) {
       backgroundColor: 'rgba(0, 0, 0, 0.95)',
       zIndex: 1000,
       overflowY: 'auto',
-      padding: 'clamp(0.5rem, 3vw, 1rem)',
+      padding: '1rem',
       display: 'flex',
-      alignItems: 'flex-start',
+      alignItems: 'center', // Center vertically on laptop
       justifyContent: 'center'
     },
     modal: {
       backgroundColor: 'white',
       borderRadius: '12px',
       width: '100%',
-      maxWidth: '95vw',
-      maxHeight: '95vh',
+      maxWidth: '900px', // Reduced from 95vw for laptops
+      maxHeight: '85vh', // Reduced height for laptops
       margin: 'auto',
       overflow: 'hidden',
       boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)'
@@ -45,7 +44,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: 'clamp(0.75rem, 3vw, 1.5rem)',
+      padding: '1rem 1.5rem',
       borderBottom: '1px solid #e5e7eb',
       backgroundColor: '#f9fafb',
       position: 'sticky',
@@ -54,7 +53,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
     },
     title: {
       margin: 0,
-      fontSize: 'clamp(1rem, 4vw, 1.25rem)',
+      fontSize: '1.25rem', // Fixed size for laptops
       fontWeight: '600',
       color: '#374151',
       lineHeight: '1.2'
@@ -62,7 +61,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
     closeBtn: {
       background: 'none',
       border: 'none',
-      fontSize: 'clamp(1.25rem, 5vw, 1.5rem)',
+      fontSize: '1.5rem',
       cursor: 'pointer',
       minHeight: '44px',
       minWidth: '44px',
@@ -73,37 +72,38 @@ function FaceRegistration({ user, onComplete, onClose }) {
       transition: 'background-color 0.2s'
     },
     content: {
-      padding: 'clamp(0.75rem, 3vw, 1.5rem)',
-      maxHeight: 'calc(95vh - 80px)',
+      padding: '1.5rem',
+      maxHeight: 'calc(85vh - 80px)',
       overflowY: 'auto'
     },
     message: {
-      padding: 'clamp(0.75rem, 3vw, 1rem)',
+      padding: '1rem',
       borderRadius: '8px',
-      marginBottom: 'clamp(0.75rem, 3vw, 1.5rem)',
+      marginBottom: '1.5rem',
       fontWeight: '500',
       textAlign: 'center',
-      fontSize: 'clamp(0.875rem, 3.5vw, 1rem)',
+      fontSize: '0.95rem',
       lineHeight: '1.4'
     },
     gridContainer: {
       display: 'grid',
       gridTemplateColumns: '1fr',
-      gap: 'clamp(1rem, 4vw, 2rem)'
+      gap: '2rem'
     },
     videoContainer: {
       position: 'relative',
       borderRadius: '12px',
       overflow: 'hidden',
       backgroundColor: '#000',
-      aspectRatio: '4/3',
-      minHeight: '250px'
+      width: '100%',
+      height: '350px', // Fixed height for better laptop viewing
+      maxHeight: '350px'
     },
     video: {
       width: '100%',
       height: '100%',
       objectFit: 'cover',
-      transform: 'scaleX(-1)' // Mirror for better UX
+      transform: 'scaleX(-1)'
     },
     canvas: {
       position: 'absolute',
@@ -112,7 +112,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
       width: '100%',
       height: '100%',
       pointerEvents: 'none',
-      transform: 'scaleX(-1)' // Mirror to match video
+      transform: 'scaleX(-1)'
     },
     loadingOverlay: {
       position: 'absolute',
@@ -128,8 +128,8 @@ function FaceRegistration({ user, onComplete, onClose }) {
       color: 'white'
     },
     spinner: {
-      width: 'clamp(40px, 8vw, 60px)',
-      height: 'clamp(40px, 8vw, 60px)',
+      width: '50px',
+      height: '50px',
       border: '4px solid rgba(255, 255, 255, 0.3)',
       borderTop: '4px solid white',
       borderRadius: '50%',
@@ -138,17 +138,17 @@ function FaceRegistration({ user, onComplete, onClose }) {
     },
     buttonGroup: {
       display: 'flex',
-      gap: 'clamp(0.5rem, 2vw, 1rem)',
-      marginTop: 'clamp(0.75rem, 3vw, 1rem)'
+      gap: '1rem',
+      marginTop: '1rem'
     },
     button: {
-      padding: 'clamp(0.75rem, 3vw, 1rem) clamp(1rem, 4vw, 1.5rem)',
+      padding: '0.75rem 1.25rem', // Smaller padding for laptops
       border: 'none',
       borderRadius: '8px',
-      fontSize: 'clamp(0.875rem, 3.5vw, 1rem)',
+      fontSize: '0.9rem', // Smaller font for laptops
       fontWeight: '500',
       cursor: 'pointer',
-      minHeight: '48px',
+      minHeight: '44px',
       flex: 1,
       transition: 'all 0.2s ease',
       display: 'flex',
@@ -174,12 +174,12 @@ function FaceRegistration({ user, onComplete, onClose }) {
       cursor: 'not-allowed'
     },
     capturedPhotos: {
-      marginTop: 'clamp(1rem, 4vw, 1.5rem)'
+      marginTop: '1.5rem'
     },
     photoGrid: {
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
-      gap: 'clamp(0.5rem, 2vw, 1rem)',
+      gap: '0.75rem',
       marginTop: '1rem'
     },
     photoItem: {
@@ -194,7 +194,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
       width: '100%',
       height: '100%',
       objectFit: 'cover',
-      transform: 'scaleX(-1)' // Mirror to match video
+      transform: 'scaleX(-1)'
     },
     confidenceBadge: {
       position: 'absolute',
@@ -204,13 +204,13 @@ function FaceRegistration({ user, onComplete, onClose }) {
       color: 'white',
       padding: '2px 6px',
       borderRadius: '12px',
-      fontSize: 'clamp(0.7rem, 3vw, 0.75rem)',
+      fontSize: '0.75rem',
       fontWeight: '500'
     },
     placeholderBox: {
       border: '2px dashed #d1d5db',
       borderRadius: '8px',
-      padding: 'clamp(1.5rem, 5vw, 2rem)',
+      padding: '2rem',
       textAlign: 'center',
       color: '#6b7280'
     },
@@ -218,22 +218,66 @@ function FaceRegistration({ user, onComplete, onClose }) {
       backgroundColor: '#f0f9ff',
       border: '1px solid #bfdbfe',
       borderRadius: '8px',
-      padding: 'clamp(0.75rem, 3vw, 1rem)',
-      marginTop: 'clamp(1rem, 4vw, 1.5rem)'
+      padding: '1rem',
+      marginTop: '1.5rem'
     },
     tipsList: {
       margin: '0.5rem 0 0 0',
       paddingLeft: '1.2rem',
-      fontSize: 'clamp(0.8rem, 3.2vw, 0.9rem)',
+      fontSize: '0.85rem',
       lineHeight: '1.5'
     }
   }
 
-  // Media queries for larger screens
+  // Laptop-specific media queries
   const mediaStyles = `
-    @media (min-width: 768px) {
+    @media (min-width: 1024px) {
       .face-registration-grid {
         grid-template-columns: 1fr 1fr;
+      }
+      
+      .face-registration-modal {
+        max-width: 800px;
+        max-height: 80vh;
+      }
+      
+      .face-registration-video {
+        height: 300px;
+      }
+      
+      .face-registration-content {
+        padding: 1.25rem;
+      }
+    }
+    
+    @media (min-width: 1280px) {
+      .face-registration-modal {
+        max-width: 900px;
+        max-height: 75vh;
+      }
+      
+      .face-registration-video {
+        height: 320px;
+      }
+    }
+    
+    @media (max-width: 767px) {
+      .face-registration-modal {
+        margin: 0.5rem;
+        max-width: calc(100vw - 1rem);
+        max-height: calc(100vh - 1rem);
+      }
+      
+      .face-registration-video {
+        height: 250px;
+      }
+      
+      .face-registration-content {
+        padding: 1rem;
+      }
+      
+      .face-registration-grid {
+        gap: 1rem;
       }
     }
     
@@ -244,7 +288,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
   `
 
   useEffect(() => {
-    // Add media styles to head
+    // Add media styles
     const styleSheet = document.createElement('style')
     styleSheet.innerText = mediaStyles
     document.head.appendChild(styleSheet)
@@ -256,23 +300,18 @@ function FaceRegistration({ user, onComplete, onClose }) {
     }
   }, [])
 
+  // ... (keep all the existing functions: initializeSystem, startCamera, loadFaceApiModels, etc.)
+  // I'll include the key ones, but you can copy the function implementations from your current code
+
   const initializeSystem = async () => {
     try {
-      console.log('🔄 Starting face registration initialization...')
-      
-      // Start camera first
       await startCamera()
-      
-      // Then load models
       setMessage('🤖 Loading AI models...')
       await loadFaceApiModels()
       setModelsLoaded(true)
-      
       setMessage('👤 Position your face clearly and tap "Capture Face"')
       setIsLoading(false)
-      
     } catch (error) {
-      console.error('❌ Initialization error:', error)
       setMessage('❌ Setup failed: ' + error.message)
       setCameraError(error.message)
       setIsLoading(false)
@@ -281,261 +320,141 @@ function FaceRegistration({ user, onComplete, onClose }) {
 
   const startCamera = async () => {
     try {
-      console.log('📹 Starting camera...')
-      setMessage('📹 Accessing your camera...')
-      
-      // Stop any existing stream
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop())
-      }
-
-      // Request camera with mobile-optimized constraints
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { 
-          facingMode: 'user',
-          width: { ideal: 640, min: 320 },
-          height: { ideal: 480, min: 240 }
-        },
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false
       })
-      
       streamRef.current = stream
-      console.log('✅ Camera stream obtained')
-      
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        videoRef.current.muted = true
-        videoRef.current.playsInline = true
-        
-        // Wait for video to be ready
-        await new Promise((resolve, reject) => {
-          videoRef.current.onloadedmetadata = () => {
-            console.log('📹 Video metadata loaded')
-            resolve()
-          }
-          
-          videoRef.current.onerror = (error) => {
-            console.error('❌ Video error:', error)
-            reject(new Error('Video element error'))
-          }
-          
-          setTimeout(() => reject(new Error('Video loading timeout')), 10000)
-        })
-
-        // Start playing video
-        try {
-          await videoRef.current.play()
-          console.log('✅ Video is playing')
-          setVideoReady(true)
-          setMessage('📹 Camera ready! Loading AI models...')
-          
-          // Start face detection after models are loaded
-          setTimeout(() => {
-            if (modelsLoaded) startFaceDetection()
-          }, 1000)
-          
-        } catch (playError) {
-          console.error('❌ Video play failed:', playError)
-          throw new Error('Could not start video playback: ' + playError.message)
-        }
+        await videoRef.current.play()
+        setVideoReady(true)
+        setTimeout(() => {
+          if (modelsLoaded) startFaceDetection()
+        }, 1000)
       }
-      
     } catch (error) {
-      console.error('❌ Camera setup failed:', error)
-      
-      let errorMessage = 'Camera setup failed: '
-      if (error.name === 'NotAllowedError') {
-        errorMessage += 'Please allow camera access and refresh.'
-      } else if (error.name === 'NotFoundError') {
-        errorMessage += 'No camera found on this device.'
-      } else if (error.name === 'NotSupportedError') {
-        errorMessage += 'Camera not supported on this browser.'
-      } else {
-        errorMessage += error.message
-      }
-      
-      setCameraError(errorMessage)
-      throw new Error(errorMessage)
+      setCameraError('Camera setup failed: ' + error.message)
+      throw error
     }
   }
 
   const loadFaceApiModels = async () => {
-    try {
-      const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
-      
-      console.log('📦 Loading face-api.js models...')
-      
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-      ])
-      
-      console.log('✅ All models loaded successfully')
-      
-    } catch (error) {
-      console.error('❌ Model loading failed:', error)
-      throw new Error('Failed to load AI models. Check internet connection.')
-    }
+    const MODEL_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+      faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+    ])
   }
 
   const startFaceDetection = () => {
-    if (!videoRef.current || !canvasRef.current || !modelsLoaded || !videoReady) {
-      console.log('⏳ Not ready for face detection yet...')
-      return
-    }
-
-    console.log('🔍 Starting face detection...')
+    if (!videoRef.current || !canvasRef.current || !modelsLoaded || !videoReady) return
     
     const video = videoRef.current
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-
-    // Set canvas size to match video
     canvas.width = video.videoWidth || 640
     canvas.height = video.videoHeight || 480
 
-    const detectFaces = async () => {
+    detectionInterval.current = setInterval(async () => {
+      if (!videoReady || isCapturing) return
       try {
-        if (!videoReady || isCapturing) return
-
         const detections = await faceapi
-          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ 
-            inputSize: 416, 
-            scoreThreshold: 0.5 
-          }))
+          .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
           .withFaceLandmarks()
           .withFaceDescriptors()
 
-        // Clear previous drawings
         ctx.clearRect(0, 0, canvas.width, canvas.height)
-
         if (detections.length > 0) {
-          // Draw detection results
           const resizedDetections = faceapi.resizeResults(detections, {
             width: canvas.width,
             height: canvas.height
           })
-          
           faceapi.draw.drawDetections(canvas, resizedDetections)
           faceapi.draw.drawFaceLandmarks(canvas, resizedDetections)
-          
-          if (detections.length === 1) {
-            setMessage(`✅ Face detected! Ready to capture (${capturedImages.length}/3 photos)`)
-          } else {
-            setMessage(`⚠️ Multiple faces detected. Please ensure only your face is visible.`)
-          }
+          setMessage(detections.length === 1 ? 
+            `✅ Face detected! Ready to capture (${capturedImages.length}/3)` : 
+            '⚠️ Multiple faces detected. Please ensure only your face is visible.')
         } else {
-          setMessage(`👤 Looking for your face... Position yourself clearly in the frame.`)
+          setMessage('👤 Looking for your face... Position yourself in the frame.')
         }
-
       } catch (error) {
         console.error('Face detection error:', error)
       }
-    }
-
-    // Start detection loop
-    detectionInterval.current = setInterval(detectFaces, 500)
+    }, 500)
   }
 
   const captureFace = async () => {
-    if (!videoRef.current || !modelsLoaded || isCapturing || capturedImages.length >= 3) return
-
+    if (!videoReady || isCapturing || capturedImages.length >= 3) return
     setIsCapturing(true)
     setMessage('📸 Capturing face data...')
 
     try {
-      const video = videoRef.current
-      
-      // Detect face with descriptor
       const detection = await faceapi
-        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ 
-          inputSize: 416, 
-          scoreThreshold: 0.5 
-        }))
+        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
         .withFaceLandmarks()
         .withFaceDescriptor()
 
       if (!detection) {
-        setMessage('❌ No clear face detected. Please position your face properly and try again.')
+        setMessage('❌ No clear face detected. Please position properly and try again.')
         setIsCapturing(false)
         return
       }
 
-      console.log('✅ Face captured with confidence:', detection.detection.score)
-
-      // Create image from video
       const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
+      canvas.width = videoRef.current.videoWidth
+      canvas.height = videoRef.current.videoHeight
       const ctx = canvas.getContext('2d')
-      ctx.drawImage(video, 0, 0)
+      ctx.drawImage(videoRef.current, 0, 0)
       
       const imageData = canvas.toDataURL('image/jpeg', 0.95)
       const faceDescriptor = Array.from(detection.descriptor)
 
-      const newCapture = {
+      setCapturedImages(prev => [...prev, {
         id: Date.now(),
         imageData,
         descriptor: faceDescriptor,
         confidence: detection.detection.score,
         timestamp: new Date().toISOString()
-      }
-
-      setCapturedImages(prev => [...prev, newCapture])
+      }])
       
       const newCount = capturedImages.length + 1
       setMessage(`✅ Photo ${newCount}/3 captured! ${newCount < 3 ? 'Take more from different angles.' : 'Ready to register!'}`)
-      
-      console.log(`✅ Captured ${newCount}/3 photos`)
-      
     } catch (error) {
-      console.error('❌ Face capture error:', error)
       setMessage('❌ Failed to capture: ' + error.message)
     }
-    
     setIsCapturing(false)
   }
 
   const registerFaces = async () => {
-    if (capturedImages.length === 0) {
-      setMessage('❌ No photos captured. Please take at least one photo.')
-      return
-    }
-
+    if (capturedImages.length === 0) return
     try {
       setMessage(`📡 Registering ${capturedImages.length} face samples...`)
       
-      const registrationData = {
-        studentId: user.id,
-        studentName: user.name,
-        email: user.email || '',
-        faceData: capturedImages.map(img => ({
-          descriptor: img.descriptor,
-          confidence: img.confidence,
-          timestamp: img.timestamp
-        })),
-        totalSamples: capturedImages.length,
-        registeredAt: new Date().toISOString()
-      }
-
-      console.log('📤 Registering face data for:', user.name)
-
       const response = await fetch(`${import.meta.env.VITE_API_URL}/face/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(registrationData)
+        body: JSON.stringify({
+          studentId: user.id,
+          studentName: user.name,
+          email: user.email || '',
+          faceData: capturedImages.map(img => ({
+            descriptor: img.descriptor,
+            confidence: img.confidence,
+            timestamp: img.timestamp
+          })),
+          totalSamples: capturedImages.length,
+          registeredAt: new Date().toISOString()
+        })
       })
 
       const result = await response.json()
-      console.log('📥 Registration result:', result)
-
       if (result.success) {
         setMessage('🎉 Face registration completed successfully!')
-        
         setTimeout(() => {
           cleanup()
           onComplete(result.data)
@@ -543,17 +462,13 @@ function FaceRegistration({ user, onComplete, onClose }) {
       } else {
         setMessage('❌ Registration failed: ' + (result.message || 'Unknown error'))
       }
-
     } catch (error) {
-      console.error('❌ Registration error:', error)
       setMessage('❌ Registration failed: ' + error.message)
     }
   }
 
   const cleanup = () => {
-    if (detectionInterval.current) {
-      clearInterval(detectionInterval.current)
-    }
+    if (detectionInterval.current) clearInterval(detectionInterval.current)
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
@@ -581,12 +496,14 @@ function FaceRegistration({ user, onComplete, onClose }) {
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.modal}>
+      <div 
+        className="face-registration-modal"
+        style={styles.modal}
+      >
         {/* Header */}
         <div style={styles.header}>
           <h2 style={styles.title}>
-            <span style={{ marginRight: '0.5rem' }}>👤</span>
-            Face Registration - {user.name}
+            👤 Face Registration - {user.name}
           </h2>
           <button 
             onClick={() => { cleanup(); onClose(); }}
@@ -598,7 +515,10 @@ function FaceRegistration({ user, onComplete, onClose }) {
           </button>
         </div>
 
-        <div style={styles.content}>
+        <div 
+          className="face-registration-content"
+          style={styles.content}
+        >
           {/* Status Message */}
           <div style={getMessageStyle()}>
             {cameraError || message}
@@ -612,8 +532,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
                   setCameraError('')
                   setVideoReady(false)
                   setIsLoading(true)
-                  setMessage('🔄 Retrying camera setup...')
-                  startCamera()
+                  initializeSystem()
                 }}
                 style={{
                   ...styles.button,
@@ -634,8 +553,10 @@ function FaceRegistration({ user, onComplete, onClose }) {
             >
               {/* Video Section */}
               <div>
-                <div style={styles.videoContainer}>
-                  {/* Video Element */}
+                <div 
+                  className="face-registration-video"
+                  style={styles.videoContainer}
+                >
                   <video
                     ref={videoRef}
                     autoPlay
@@ -645,29 +566,17 @@ function FaceRegistration({ user, onComplete, onClose }) {
                       ...styles.video,
                       display: videoReady ? 'block' : 'none'
                     }}
-                    onPlay={() => {
-                      console.log('📹 Video started playing')
-                      setVideoReady(true)
-                    }}
-                    onError={(e) => {
-                      console.error('📹 Video error:', e)
-                      setCameraError('Video playback failed')
-                    }}
                   />
                   
-                  {/* Detection Canvas Overlay */}
                   <canvas
                     ref={canvasRef}
                     style={styles.canvas}
                   />
                   
-                  {/* Loading Overlay */}
                   {(!videoReady && !cameraError) && (
                     <div style={styles.loadingOverlay}>
                       <div style={styles.spinner} />
-                      <p style={{ margin: 0, fontSize: 'clamp(0.875rem, 3.5vw, 1rem)' }}>
-                        Setting up camera...
-                      </p>
+                      <p style={{ margin: 0 }}>Setting up camera...</p>
                     </div>
                   )}
                 </div>
@@ -684,7 +593,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
                            styles.disabledBtn : styles.primaryBtn)
                       }}
                     >
-                      {isCapturing ? '📸 Capturing...' : `📸 Capture Face (${capturedImages.length}/3)`}
+                      {isCapturing ? '📸 Capturing...' : `📸 Capture (${capturedImages.length}/3)`}
                     </button>
 
                     {capturedImages.length > 0 && (
@@ -711,7 +620,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
                       ...styles.button,
                       ...styles.secondaryBtn,
                       width: '100%',
-                      marginTop: 'clamp(0.5rem, 2vw, 1rem)'
+                      marginTop: '1rem'
                     }}
                   >
                     ✅ Complete Registration ({capturedImages.length} photos)
@@ -724,7 +633,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
                 <h4 style={{ 
                   marginTop: 0, 
                   marginBottom: '1rem',
-                  fontSize: 'clamp(1rem, 4vw, 1.125rem)',
+                  fontSize: '1rem',
                   color: '#374151'
                 }}>
                   📸 Captured Photos:
@@ -732,21 +641,9 @@ function FaceRegistration({ user, onComplete, onClose }) {
                 
                 {capturedImages.length === 0 ? (
                   <div style={styles.placeholderBox}>
-                    <div style={{ 
-                      fontSize: 'clamp(2rem, 8vw, 3rem)', 
-                      marginBottom: '1rem' 
-                    }}>📷</div>
-                    <p style={{ 
-                      margin: '0 0 0.5rem 0',
-                      fontSize: 'clamp(0.875rem, 3.5vw, 1rem)'
-                    }}>
-                      No photos captured yet
-                    </p>
-                    <p style={{ 
-                      margin: 0,
-                      fontSize: 'clamp(0.8rem, 3.2vw, 0.875rem)',
-                      color: '#9ca3af'
-                    }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📷</div>
+                    <p style={{ margin: '0 0 0.5rem 0' }}>No photos captured yet</p>
+                    <p style={{ margin: 0, fontSize: '0.875rem', color: '#9ca3af' }}>
                       Take 1-3 photos from different angles
                     </p>
                   </div>
@@ -772,7 +669,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
                   <h5 style={{ 
                     margin: '0 0 0.5rem 0', 
                     color: '#1e40af',
-                    fontSize: 'clamp(0.9rem, 3.6vw, 1rem)'
+                    fontSize: '0.9rem'
                   }}>
                     💡 Tips for best results:
                   </h5>
@@ -780,8 +677,7 @@ function FaceRegistration({ user, onComplete, onClose }) {
                     <li>Look directly at the camera</li>
                     <li>Ensure good lighting on your face</li>
                     <li>Keep a neutral expression</li>
-                    <li>Take photos from slightly different angles</li>
-                    <li>Avoid glasses or face coverings if possible</li>
+                    <li>Take photos from different angles</li>
                   </ul>
                 </div>
               </div>
